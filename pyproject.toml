@@ -4,7 +4,7 @@ build-backend = "uv_build"
 
 [project]
 name = "pyzk20r"
-version = "0.1.1"
+version = "0.1.2"
 description = "ZKTeco Live20R 指纹采集器 Python 库 (ZKFinger SDK C API, 纯 ctypes, 零依赖, 支持 Windows XP / Python 3.7+)"
 readme = "README.md"
 requires-python = ">=3.7"
@@ -34,7 +34,7 @@ classifiers = [
 ]
 
 [project.urls]
-Homepage = "https://www.zksps.com/productinfo/46887.html"
+Homepage = "https://github.com/yunluo/pyzk20r"
 
 [tool.uv.build-backend]
 module-name = "pyzk20r"
