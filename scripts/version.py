@@ -399,7 +399,24 @@ def do_release(version, message=None):
     return tag
 
 
+def setup_stdio():
+    """把 stdout/stderr 切成 UTF-8。
+
+    Windows 上 stdout 重定向到管道时用的是本地代码页 (GitHub runner 是 cp1252),
+    打印中文会抛 UnicodeEncodeError, 这里统一按 UTF-8 输出。
+    """
+    for stream in (sys.stdout, sys.stderr):
+        reconfigure = getattr(stream, "reconfigure", None)
+        if reconfigure is None:
+            continue
+        try:
+            reconfigure(encoding="utf-8", errors="replace")
+        except (ValueError, OSError):  # pragma: no cover - 取决于运行环境的流实现
+            pass
+
+
 def main(argv=None):
+    setup_stdio()
     parser = argparse.ArgumentParser(
         description="版本号工具: 保证 pyproject.toml / __init__.py / uv.lock / tag 四处一致",
     )

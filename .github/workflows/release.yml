@@ -17,6 +17,8 @@ jobs:
       - run: uv sync
       # 用 python -m 方式调用 pytest: Windows 上 .exe shim 在部分环境会被当成源码解析
       - run: uv run python -m pytest -q
+        env:
+          PYTHONIOENCODING: utf-8    # Windows runner 默认 cp1252, 中文输出会崩
 
   build:
     name: 构建并校验版本

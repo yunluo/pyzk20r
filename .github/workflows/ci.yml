@@ -21,8 +21,8 @@ jobs:
         run: uvx "ruff>=0.17,<0.18" check .
       - name: ruff format 检查
         run: uvx "ruff>=0.17,<0.18" format --check .
-      - name: mypy 类型检查
-        run: uvx --from "mypy>=2.4,<3" mypy src/pyzk20r
+      - name: ty 类型检查
+        run: uvx ty check
       - name: 构建产物校验
         run: uv build
 
@@ -56,4 +56,6 @@ jobs:
       - name: 同步依赖 (含 dev 组)
         run: uv sync
       - name: 测试 (mock 全量 + 真机冒烟自动跳过)
+        env:
+          PYTHONIOENCODING: utf-8    # Windows runner 默认 cp1252, 中文输出会崩
         run: uv run python -m pytest -q

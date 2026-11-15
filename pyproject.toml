@@ -60,5 +60,9 @@ target-version = "py37"
 [tool.ruff.lint]
 select = ["E", "F", "W", "I", "UP004"]
 
-[tool.mypy]
-files = ["src/pyzk20r"]
+[tool.ty.src]
+include = ["src/pyzk20r"]
+
+[tool.ty.environment]
+python-version = "3.7"       # 项目支持下限, 按 3.7 校验语法与标准库
+python-platform = "win32"     # 本库仅支持 Windows

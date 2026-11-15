@@ -238,10 +238,10 @@ sequenceDiagram
 ```bash
 uv run pytest                     # mock 单元测试 + 真机冒烟 (无设备自动跳过)
 uv run ruff check .               # lint
-uv run mypy                       # 类型检查 (PEP 484 标注)
+uvx ty check                      # 类型检查 (ty, 按 3.7 + win32 校验)
 ```
 
-dev 工具由 `[dependency-groups]` 提供 (pytest), `uv run` 自动同步; ruff/mypy 用
+dev 工具由 `[dependency-groups]` 提供 (pytest), `uv run` 自动同步; ruff/ty 用
 `uvx` 隔离运行 (不受项目 Python 版本约束影响)。
 
 仓库采用 **src 布局** (`src/pyzk20r/`), 包源码不在仓库根目录, 避免与测试/示例混在一起:
