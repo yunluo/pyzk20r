@@ -4,8 +4,8 @@
 
 基于官方 [ZKFinger Reader SDK C API](https://www.zksps.com/productinfo/46887.html) 的纯 `ctypes` 封装:
 
-- **零第三方依赖**, 纯标准库
-- 支持 **Windows XP / Python 3.7+** (单一代码库, 类型标注为 PEP 484:
+- **零第三方依赖**, 纯标准库 (Python 3.4 例外: 自动附带官方 `typing` 移植包)
+- 支持 **Windows XP / Python 3.4+** (单一代码库, 类型标注为 PEP 484:
   参数/返回内联标注 + typing 构造, 变量类型用注释)
 - 使用驱动安装的系统 DLL (不捆绑分发, 见 DLL 查找顺序)
 - 同步阻塞 + 生成器式持续采集; 无内部线程, 单线程使用; 方法粒度小, 便于子类覆写
@@ -222,23 +222,25 @@ sequenceDiagram
 
 > 未安装许可文件 `zkfinger.lic` 时 SDK 会打印许可警告但功能可用 (算法 v12)。
 
-## XP / Python 3.7 部署要点
+## XP / Python 3.4 部署要点
 
-- 目标机安装 **x86 版 Python 3.7+** 与 Live20R/SLK20R USB 驱动
-  (XP 上推荐 3.7.9; 3.8+ 已不支持 XP)
-- `pip install pyzk20r-0.1.1-py3-none-any.whl` (纯 Python wheel, 无需编译)。
+- 目标机安装 **x86 版 Python** 与 Live20R/SLK20R USB 驱动
+  (XP 最高只能装 3.4.4; Win7 最高 3.8 —— 均在支持范围内)
+- Python 3.4 无内置 typing 模块: `pip install pyzk20r` 会自动带上官方
+  `typing` 移植包 (声明的条件依赖 `typing; python_version < "3.5"`)
+- wheel 纯 Python 无需编译。
   注意: 构建产物为 Metadata-Version 2.4, XP 上的老版 pip 若拒绝安装,
   先升级 pip (`python -m pip install -U "pip<20"`), 或直接把 wheel 当 zip
   解包进 site-packages (纯 Python 包, 解包即用)
 - XP 下 `libzkfp.dll` 依赖系统 VC 运行库; 若加载报错, 安装 VC++ 2010/2013 运行库 (x86)
-- 本库代码不含 f-string / 3.5+ 语法 (CI 有语法守卫测试)
+- 本库源码不含 f-string / 3.5+ 语法 (CI 有 ast 语法守卫测试)
 
 ## 开发
 
 ```bash
 uv run pytest                     # mock 单元测试 + 真机冒烟 (无设备自动跳过)
 uv run ruff check .               # lint
-uvx ty check                      # 类型检查 (ty, 按 3.7 + win32 校验)
+uvx ty check                      # 类型检查 (ty 最低支持 3.7; 运行时兼容声明 3.4)
 ```
 
 dev 工具由 `[dependency-groups]` 提供 (pytest), `uv run` 自动同步; ruff/ty 用

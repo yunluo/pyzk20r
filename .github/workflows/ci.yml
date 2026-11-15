@@ -61,12 +61,13 @@ jobs:
         run: uv run python -m pytest -q
 
   test-py37:
-    name: pytest (py3.7, 支持下限)
+    name: pytest (py3.7, CI 可验证下限)
     needs: lint
     runs-on: windows-latest
     steps:
       - uses: actions/checkout@v4
-      # uv 不再支持 Python 3.7 (且 uv_build 后端要求 >=3.8), 这一档改用 pip
+      # uv 不再支持 Python 3.7 (且 uv_build 后端要求 >=3.8), 这一档改用 pip;
+      # runner 镜像无 Python 3.4, 库声明的 3.4 下限由 ast 语法守卫测试覆盖
       - uses: actions/setup-python@v5
         with:
           python-version: "3.7"

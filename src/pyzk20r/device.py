@@ -12,7 +12,8 @@
             break
 
 子类可覆写 ``on_enroll_progress`` / ``acquire`` / ``_try_acquire`` 等钩子。
-语法兼容 Python 3.7 (Windows XP): 类型标注用内联标注 (PEP 3107) + typing 构造。
+语法兼容 Python 3.4+ (Windows XP): 类型标注用内联标注 (PEP 3107) + typing 构造
+(3.4 无内置 typing, 声明了 ``typing; python_version < "3.5"`` 依赖自动补齐)。
 """
 
 from __future__ import absolute_import

@@ -4,8 +4,9 @@
 低层封装: DLL 加载/定位、函数原型声明、错误码与参数代码枚举、
 全局初始化引用计数。上层 (device/db) 只通过本模块访问 SDK。
 
-语法兼容 Python 3.7 (Windows XP): 禁用 f-string / 变量标注语法;
-类型标注用内联标注 (PEP 3107) + typing 构造。
+语法兼容 Python 3.4+ (Windows XP): 禁用 f-string / 变量标注语法;
+类型标注用内联标注 (PEP 3107) + typing 构造
+(3.4 无内置 typing, 声明了 ``typing; python_version < "3.5"`` 依赖自动补齐)。
 """
 
 from __future__ import absolute_import

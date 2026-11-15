@@ -49,7 +49,7 @@ def test_enroll_multiple_fingers_same_user(fake_dll):
 
 
 # ---------------------------------------------------------------------------
-# Python 3.7 语法守卫: 包内源码必须能在 3.7 语法下解析
+# Python 3.4 语法守卫: 包内源码必须能在 3.4 语法下解析
 # ---------------------------------------------------------------------------
 
 
@@ -94,10 +94,13 @@ def test_no_percent_string_formatting():
 
 
 @pytest.mark.skipif(sys.version_info < (3, 8), reason="ast feature_version 需 Python 3.8+")
-def test_sources_parse_as_py37():
-    """feature_version=(3,7) 拒绝 3.8+ 语法 (海象运算符/仅位置参数/赋值表达式 等)。"""
+def test_sources_parse_as_py34():
+    """feature_version=(3,4) 拒绝 3.5+ 语法 (f-string/变量标注/async/海象运算符 等)。
+
+    运行时兼容声明为 3.4 (XP 部署), 语法必须守住下限。
+    """
     for path, source in _package_sources():
-        ast.parse(source, filename=path, feature_version=(3, 7))
+        ast.parse(source, filename=path, feature_version=(3, 4))
 
 
 def test_typing_import_guarded():

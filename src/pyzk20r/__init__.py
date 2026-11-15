@@ -2,7 +2,8 @@
 """pyzk20r — 中控智慧 (ZKTeco) Live20R 指纹采集器 Python 库。
 
 基于官方 ZKFinger Reader SDK C API (libzkfp.dll) 的纯 ctypes 封装,
-零第三方依赖, 支持 Windows XP / Python 3.7+。
+零第三方依赖, 支持 Windows XP / Python 3.4+ (3.4 无内置 typing,
+安装时自动附带官方 typing 移植包)。
 
 快速上手::
 

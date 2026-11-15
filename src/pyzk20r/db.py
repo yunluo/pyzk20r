@@ -15,7 +15,8 @@ SDK 内部以唯一 ``fid`` 存储每枚模板; 本层自动分配 fid 并维护
         uid, score = db.identify(dev.acquire().template)
         score = db.verify("A001", dev.acquire().template)
 
-语法兼容 Python 3.7 (Windows XP): 类型标注用内联标注 (PEP 3107) + typing 构造。
+语法兼容 Python 3.4+ (Windows XP): 类型标注用内联标注 (PEP 3107) + typing 构造
+(3.4 无内置 typing, 声明了 ``typing; python_version < "3.5"`` 依赖自动补齐)。
 """
 
 from __future__ import absolute_import

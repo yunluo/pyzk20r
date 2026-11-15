@@ -5,13 +5,15 @@ build-backend = "uv_build"
 [project]
 name = "pyzk20r"
 version = "0.1.2"
-description = "ZKTeco Live20R 指纹采集器 Python 库 (ZKFinger SDK C API, 纯 ctypes, 零依赖, 支持 Windows XP / Python 3.7+)"
+description = "ZKTeco Live20R 指纹采集器 Python 库 (ZKFinger SDK C API, 纯 ctypes, 零依赖, 支持 Windows XP / Python 3.4+)"
 readme = "README.md"
-requires-python = ">=3.7"
+requires-python = ">=3.4"
 license = "MIT"
 license-files = ["LICENSE"]
 authors = [{ name = "yunluo" }]
 keywords = ["zkteco", "fingerprint", "live20r", "biometrics", "libzkfp"]
+# Python 3.4 无内置 typing 模块, 用官方 typing 移植包补齐 (现代版本不受影响)
+dependencies = ['typing; python_version < "3.5"']
 classifiers = [
     "Development Status :: 4 - Beta",
     "Intended Audience :: Developers",
@@ -22,6 +24,9 @@ classifiers = [
     "Operating System :: Microsoft :: Windows :: Windows 11",
     "Programming Language :: Python :: 3",
     "Programming Language :: Python :: 3 :: Only",
+    "Programming Language :: Python :: 3.4",
+    "Programming Language :: Python :: 3.5",
+    "Programming Language :: Python :: 3.6",
     "Programming Language :: Python :: 3.7",
     "Programming Language :: Python :: 3.8",
     "Programming Language :: Python :: 3.9",
@@ -44,7 +49,9 @@ source-exclude = ["**/*.db"]                 # 排除指纹数据文件
 
 [dependency-groups]
 dev = [
-    "pytest",
+    # pytest 仅在 >=3.7 生效: requires-python 声明 3.4 后, 不加标记 uv 会按全范围
+    # 解析出 pytest 4.x (最后支持 3.4 的版本), 现代 Python 下的测试反而被降级
+    'pytest>=7,<8; python_version >= "3.7"',
 ]
 
 [tool.pytest.ini_options]
@@ -64,5 +71,5 @@ select = ["E", "F", "W", "I", "UP004"]
 include = ["src/pyzk20r"]
 
 [tool.ty.environment]
-python-version = "3.7"       # 项目支持下限, 按 3.7 校验语法与标准库
+python-version = "3.7"       # ty 最低只支持 3.7; 运行时兼容声明为 3.4 (3.4 装 typing 移植)
 python-platform = "win32"     # 本库仅支持 Windows
