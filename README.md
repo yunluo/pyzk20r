@@ -167,19 +167,19 @@ flowchart TD
         D2{"选择"}
     end
 
-    D -->|"[1] 指纹登录"| F["等待手指<br/>acquire(timeout=60)"]
-    F -->|"超时 / 采集失败"| FR["红灯 1.5s"] --> D
-    F -->|取到指纹| G["db.identify(模板)<br/>1:N 识别"]
-    G -->|"MatchError 未识别"| H["红灯 1.5s<br/>提示: 未识别<br/>请用工号+密码登录"] --> D
-    G -->|"返回 (工号, 分数)"| IG["绿灯 1.5s"] --> I["do_login(工号)<br/>调用你的工业软件 API"]
-    I --> OK([自动登录成功<br/>进入系统])
-
-    D -->|"[2] 登记员工指纹"| K["输入工号<br/>新员工建档 / 老员工追加"]
+    D -->|"[1] 登记员工指纹"| K["输入工号<br/>新员工建档 / 老员工追加"]
     K --> L["按手指 3 次<br/>db.enroll: 采集 → DBMerge → 入库"]
     L --> SG["绿灯 1.5s"] --> S["SQLite 保存<br/>save_fingerprints()"]
     S --> Q{继续加录一枚?}
     Q -->|y| L
     Q -->|N| D
+
+    D -->|"[2] 指纹登录"| F["等待手指<br/>acquire(timeout=60)"]
+    F -->|"超时 / 采集失败"| FR["红灯 1.5s"] --> D
+    F -->|取到指纹| G["db.identify(模板)<br/>1:N 识别"]
+    G -->|"MatchError 未识别"| H["红灯 1.5s<br/>提示: 未识别<br/>请用工号+密码登录"] --> D
+    G -->|"返回 (工号, 分数)"| IG["绿灯 1.5s"] --> I["do_login(工号)<br/>调用你的工业软件 API"]
+    I --> OK([自动登录成功<br/>进入系统])
 
     D -->|"[3] 删除员工"| R["db.remove(工号)<br/>删除 SQLite 记录"] --> D
 
@@ -201,7 +201,7 @@ sequenceDiagram
     participant MES as 你的工业软件<br/>do_login(工号)
 
     Note over App,Store: 程序启动时: load_db() 从 SQLite 重建内存库
-    W->>App: 选择 [1] 指纹登录
+    W->>App: 选择 [2] 指纹登录
     App->>SDK: acquire(timeout=60) 轮询取像 (白灯固件自动点亮)
     W->>SDK: 按压手指
     SDK-->>App: Frame(图像 + 模板 ~1.3KB)

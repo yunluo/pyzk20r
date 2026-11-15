@@ -127,7 +127,7 @@ def remove_worker(conn, db):
 
 def finger_login(conn, db, dev):
     if not db.users:
-        print("尚未登记任何指纹, 请管理员先选 [2] 登记员工指纹 (先注册, 后使用)")
+        print("尚未登记任何指纹, 请管理员先选 [1] 登记员工指纹 (先注册, 后使用)")
         return
     print("请按指纹 ({} 秒超时)...".format(LOGIN_TIMEOUT))
     try:
@@ -174,17 +174,17 @@ def main():
     while True:
         print("\n===== 工业软件登录 =====")
         if dev is not None:
-            print(" [1] 指纹登录")
-            print(" [2] 登记员工指纹")
+            print(" [1] 登记员工指纹")
+            print(" [2] 指纹登录")
             print(" [3] 删除员工")
         print(" [p] 工号+密码登录 (兜底)")
         print(" [q] 退出")
         choice = input("选择: ").strip()
         try:
             if choice == "1" and dev is not None:
-                finger_login(conn, db, dev)
-            elif choice == "2" and dev is not None:
                 register_worker(conn, db, dev)
+            elif choice == "2" and dev is not None:
+                finger_login(conn, db, dev)
             elif choice == "3" and dev is not None:
                 remove_worker(conn, db)
             elif choice == "p":
