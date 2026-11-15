@@ -90,7 +90,7 @@ class LEDRecordingDLL(FakeDLL):
 
 
 class UnsupportedLEDDLL(LEDRecordingDLL):
-    """模拟无可编程三色灯的固件: LED 参数写入一律失败 (实测 PID_0120 行为)。"""
+    """模拟不支持灯效的机型: LED 参数写入一律失败 (防御性用例)。"""
 
     def ZKFPM_SetParameters(self, handle, code, buf, cb):
         if int(code) in (Param.LED_WHITE, Param.LED_GREEN, Param.LED_RED):
@@ -182,7 +182,7 @@ class TestIndustrialLoginExample(FakeDLLTestCase):
         db.close()
 
     def test_login_success_without_led_hardware(self):
-        """无三色灯硬件 (LED 写入失败) 时, 灯效静默降级, 登录流程不受影响。"""
+        """灯效写入失败时 (不支持灯效的机型), 静默降级, 登录流程不受影响。"""
         self.fake_dll = UnsupportedLEDDLL()
         _binding.dll = self.fake_dll
         dev = Scanner()
