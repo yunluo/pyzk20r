@@ -17,6 +17,7 @@ typing 构造以字符串形式标注 (运行时不求值), 变量类型用注�
 """
 from __future__ import absolute_import
 
+import collections.abc
 import ctypes
 import struct
 import time
@@ -32,9 +33,6 @@ from .exceptions import (
     error_class,
     raise_for,
 )
-
-if False:
-    from typing import Generator, List, Optional, Tuple  # noqa: F401 -- 仅类型标注 (3.4 兼容)
 
 __all__ = ["DeviceInfo", "Frame", "Scanner"]
 
@@ -107,10 +105,10 @@ class Scanner:
     初始化计数均不加锁, 请勿在多个线程并发构造/关闭设备或并发采集。
     """
 
-    def __init__(self, index: int = 0, dll_path: "Optional[str]" = None) -> None:
+    def __init__(self, index: int = 0, dll_path: "str | None" = None) -> None:
         self._index = int(index)
         self._dll_path = dll_path
-        self._handle = None                            # type: Optional[int]
+        self._handle = None                            # type: int | None
         self.open()
 
     # -- 生命周期 -----------------------------------------------------------
@@ -258,7 +256,7 @@ class Scanner:
 
     # -- 采集 ---------------------------------------------------------------
 
-    def capture_params(self) -> "Tuple[int, int, int]":
+    def capture_params(self) -> "tuple[int, int, int]":
         """返回 (width, height, dpi)。"""
         handle = self._require_open()
         w, h, dpi = ctypes.c_int(), ctypes.c_int(), ctypes.c_int()
@@ -276,7 +274,7 @@ class Scanner:
         raise_for(ret, "取像失败")
         return buf.raw
 
-    def _try_acquire(self) -> "Optional[Frame]":
+    def _try_acquire(self) -> "Frame | None":
         """尝试采集一次; 瞬态失败 (暂无手指等) 返回 None, 其他错误抛异常。"""
         handle = self._require_open()
         width, height, dpi = self.capture_params()
@@ -298,7 +296,7 @@ class Scanner:
             raise CaptureError(int(ZKFPErr.CAPTURE), "取像失败")
         return frame
 
-    def capture(self, poll_interval: float = 0.1) -> "Generator[Frame, None, None]":
+    def capture(self, poll_interval: float = 0.1) -> "collections.abc.Iterator[Frame]":
         """持续采集生成器: 反复尝试, 成功则 yield Frame, 失败休眠重试。
 
         ``poll_interval`` 为失败重试间隔秒数 (0 为连续轮询)。
@@ -311,13 +309,13 @@ class Scanner:
             elif poll_interval > 0:
                 time.sleep(poll_interval)
 
-    def enroll(self, poll_interval: float = 0.1) -> "List[bytes]":
+    def enroll(self, poll_interval: float = 0.1) -> "list[bytes]":
         """连续采集 3 次 (SDK 登记合并 ZKFPM_DBMerge 固定要求 3 枚), 返回模板列表。
 
         每成功一次调用一次 :meth:`on_enroll_progress` 钩子。
         """
         total = 3
-        templates = []                                 # type: List[bytes]
+        templates = []                                 # type: list[bytes]
         while len(templates) < total:
             frame = self._try_acquire()
             if frame is None:

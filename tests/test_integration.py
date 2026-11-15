@@ -64,46 +64,28 @@ def test_sources_parse_as_py34():
         ast.parse(source, filename=path, feature_version=(3, 4))
 
 
-def test_sources_have_no_fstring_and_no_runtime_typing():
-    """双保险: 禁 f-string; 禁运行时 typing 导入 (仅允许 ``if False:`` 死分支内的标注导入)。"""
+def test_sources_have_no_fstring_and_no_typing_import():
+    """双保险: 禁 f-string; 禁任何形式的 typing 导入 (含 ``if False:`` 死分支)。
+
+    复杂类型一律用字符串形式标注 (``"list[bytes]"`` / ``"str | None"``),
+    由类型检查器解析, 运行时与 3.4 均无 typing 依赖。
+    """
     for path, source in _package_sources():
         tree = ast.parse(source)
         for node in ast.walk(tree):
             assert not isinstance(node, ast.JoinedStr), "f-string 禁用于 3.4: %s" % path
-        for node in _live_imports(tree):
-            mod = getattr(node, "module", "") or ""
-            assert mod != "typing", "禁止运行时导入 typing: %s" % path
-            for alias in node.names:
-                assert alias.name != "typing", "禁止运行时导入 typing: %s" % path
-
-
-def _live_imports(tree):
-    """返回 AST 中不在 ``if False:`` 死分支内的 Import/ImportFrom 节点。"""
-    live = []
-
-    def visit(node, dead):
-        for child in ast.iter_child_nodes(node):
-            child_dead = dead or (
-                isinstance(child, ast.If) and _is_constant_false(child.test)
-            )
-            if isinstance(child, (ast.Import, ast.ImportFrom)) and not child_dead:
-                live.append(child)
-            visit(child, child_dead)
-
-    visit(tree, False)
-    return live
-
-
-def _is_constant_false(test):
-    if isinstance(test, ast.Name):
-        return test.id == "False"
-    return isinstance(test, ast.Constant) and test.value is False
+            if isinstance(node, ast.Import):
+                for alias in node.names:
+                    assert alias.name != "typing", "禁止导入 typing: %s" % path
+            elif isinstance(node, ast.ImportFrom):
+                mod = node.module or ""
+                assert mod != "typing", "禁止导入 typing: %s" % path
 
 
 def test_sources_use_inline_annotations():
     """公共 API 使用内联参数/返回标注; 禁止旧式全签名注释 ``# type: (...)``。
 
-    变量类型注释 (如 ``x = None  # type: Optional[int]``) 仍允许 —— 3.4 无变量标注语法。
+    变量类型注释 (如 ``x = None  # type: int | None``) 仍允许 —— 3.4 无变量标注语法。
     """
     core = ["device.py", "db.py", "exceptions.py", "_binding.py"]
     for name in core:

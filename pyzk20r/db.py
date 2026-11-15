@@ -24,12 +24,8 @@ import ctypes
 
 from . import _binding
 from ._binding import MAX_TEMPLATE_SIZE, DBParam
+from .device import Scanner
 from .exceptions import LibraryError, MatchError, MergeError, error_class, raise_for
-
-if False:
-    from typing import List, Optional, Tuple  # noqa: F401 -- 仅类型标注 (3.4 兼容)
-
-    from .device import Scanner  # noqa: F401 -- 仅类型标注 (3.4 兼容)
 
 __all__ = ["FingerprintDB"]
 
@@ -46,9 +42,9 @@ class FingerprintDB:
     支持 with 上下文管理; 也可当纯算法库用 (不接设备也能比对模板)。
     """
 
-    def __init__(self, dll_path: "Optional[str]" = None) -> None:
+    def __init__(self, dll_path: "str | None" = None) -> None:
         self._dll_path = dll_path
-        self._handle = None                            # type: Optional[int]
+        self._handle = None                            # type: int | None
         handle = _binding.lib_addref(dll_path).ZKFPM_DBInit()
         if not handle:
             _binding.lib_release()
@@ -99,7 +95,7 @@ class FingerprintDB:
         self._fid_templates[fid] = bytes(template)
         self._user_fids.setdefault(user_id, []).append(fid)
 
-    def remove(self, user_id: int, template: "Optional[bytes]" = None) -> None:
+    def remove(self, user_id: int, template: "bytes | None" = None) -> None:
         """删除某用户的指纹; 传 ``template`` 只删匹配的那一枚, 否则全删。"""
         handle = self._require_open()
         target = bytes(template) if template is not None else None
@@ -133,17 +129,17 @@ class FingerprintDB:
         return n.value
 
     @property
-    def users(self) -> "List[int]":
+    def users(self) -> "list[int]":
         """已登记的用户 ID 列表 (升序)。"""
         return sorted(self._user_fids)
 
-    def fingers_of(self, user_id: int) -> "List[bytes]":
+    def fingers_of(self, user_id: int) -> "list[bytes]":
         """某用户已登记的全部模板 (bytes 列表)。"""
         return [self._fid_templates[f] for f in self._user_fids.get(user_id, [])]
 
     # -- 合并与登记流程 -------------------------------------------------------
 
-    def merge(self, templates: "List[bytes]") -> bytes:
+    def merge(self, templates: "list[bytes]") -> bytes:
         """将 3 枚采集模板合并为 1 枚登记模板。"""
         if len(templates) != MERGE_COUNT:
             raise MergeError(-22, "合并需要恰好 %d 枚模板" % MERGE_COUNT)
@@ -156,7 +152,7 @@ class FingerprintDB:
         raise_for(ret, "合并登记模板失败")
         return out.raw[:out_len.value]
 
-    def enroll(self, scanner: "Scanner", user_id: int, poll_interval: float = 0.1) -> bytes:
+    def enroll(self, scanner: Scanner, user_id: int, poll_interval: float = 0.1) -> bytes:
         """完整登记流程: 用 ``scanner`` 采 3 次 -> 合并 -> 存为 ``user_id`` 的指纹。
 
         返回登记模板。进度回调见 :meth:`pyzk20r.device.Scanner.on_enroll_progress`。
@@ -168,7 +164,7 @@ class FingerprintDB:
 
     # -- 比对 -----------------------------------------------------------------
 
-    def identify(self, template: bytes) -> "Tuple[int, int]":
+    def identify(self, template: bytes) -> "tuple[int, int]":
         """1:N 识别, 返回 ``(user_id, score)``; 无匹配抛 :class:`MatchError`。
 
         其他 SDK 错误 (-7/-17 等) 按原始错误码抛对应异常, 不误报为"无匹配"。
