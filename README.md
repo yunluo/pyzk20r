@@ -10,6 +10,8 @@
 - 使用驱动安装的系统 DLL (不捆绑分发, 见 DLL 查找顺序)
 - 同步阻塞 + 生成器式持续采集; 无内部线程, 单线程使用; 方法粒度小, 便于子类覆写
 - **一人多指纹** 模型: `user_id` 可登记多枚指纹, 识别直接返回用户
+- **可选的会话层** `FingerprintSession`: 等待手指 → 采集 → 比对 → 灯效反馈
+  一键编排 (白灯引导 / 绿 success / 红 failure), 面向工业终端场景
 
 ## 安装
 
@@ -53,6 +55,21 @@ with Scanner() as dev:
         break
 ```
 
+工业终端一键流程 (等待手指 → 采集 → 识别 → 灯效反馈):
+
+```python
+from pyzk20r import FingerprintDB, FingerprintSession, Scanner
+
+db = FingerprintDB()
+with Scanner() as dev:
+    with FingerprintSession(db, dev) as session:
+        result = session.wait_login(timeout=30)  # 白灯引导, 绿=通过 / 红=失败
+        if result.ok:
+            print("工号:", result.user_id, "分数:", result.score)
+        else:
+            print("未通过:", result.reason)  # no_match / timeout / ...
+```
+
 ## API 概览
 
 ### `Scanner(index=0, dll_path=None)` — 采集器
@@ -72,7 +89,9 @@ with Scanner() as dev:
 | `template_format` (`'ansi'/'iso'`, 可读写) | 模板标准 |
 | `template_quality(template)` | 模板质量分 |
 | `device_ok` | 设备状态 |
-| `open() / close()` / `with` | 生命周期, 可重复 close |
+| `capture_params()` | 采集参数 → `(width, height, dpi)` |
+| `get_param_bytes(code, size)` / `get_param_int(code)` / `get_param_str(code)` / `set_param_int(code, value)` | 通用参数读写 (参数码见 `Param`; 逃生口, 常规使用走上面的具名属性) |
+| `open() / close()` / `closed` / `with` | 生命周期, 可重复 close |
 
 ### `Frame` — 单次采集帧
 
@@ -82,7 +101,7 @@ with Scanner() as dev:
 
 | 成员 | 说明 |
 | --- | --- |
-| `enroll(scanner, user_id, timeout=None)` | 完整登记: 采 3 次 → 合并 → 存入该用户名下 |
+| `enroll(scanner, user_id, poll_interval=0.1, timeout=None)` | 完整登记: 采 3 次 → 合并 → 存入该用户名下 |
 | `add(user_id, template)` | 直接添加一枚模板 (同一 user_id 可多次) |
 | `identify(template)` | 1:N → `(user_id, score)`, 无匹配抛 `MatchError` |
 | `verify(user_id, template)` | 1:1 → 最优分数, 不匹配抛 `MatchError` |
@@ -104,7 +123,10 @@ with Scanner() as dev:
 | `wait_login(timeout=None, poll_interval=0.15, user_id=None)` | 等手指 → 采集 → 比对 → 灯效; `user_id=None` 走 1:N 识别 (返回工号), 给定工号走 1:1 验证 (返回分数) |
 | `wait_enroll(user_id, timeout=None, poll_interval=0.15)` | 等手指 → 采 3 次 → 合并 → 入库 → 灯效 |
 | `on_event(event, data=None)` | 事件回调钩子 (可覆写); 构造参数 `on_event` 优先 |
+| `emit(event, data=None)` | 手动派发事件 (供应用层自定义流程复用同一套回调) |
 | `close()` / `with` | 熄灭全部三色灯 (可重复调用) |
+| `FLASH_SECONDS = 1.5` | 结果灯 (绿/红) 显示时长, 可按实例覆盖 |
+| `lights=True` | 构造参数; 传 `False` 则完全不写灯效参数 (纯逻辑流程) |
 
 灯效规则: **等待手指白灯常亮 → 成功绿灯 → 失败/超时/异常红灯** (绿/红亮
 `FLASH_SECONDS` 秒后自动熄灭回到等待态)。灯效写入失败会静默降级, 绝不阻断
@@ -121,8 +143,17 @@ with Scanner() as dev:
 | `REASON_TIMEOUT` | 等待手指超时 |
 | `REASON_DEVICE_ERROR` | 设备/算法库错误 |
 
-事件名: `wait_start` / `captured` / `success` / `failed` / `enroll_start` /
-`enroll_progress` / `enroll_done`。
+事件名与 `data` 负载:
+
+| 事件 | `data` | 触发时机 |
+| --- | --- | --- |
+| `wait_start` | `{"timeout": ...}` | 开始等待手指 (白灯亮) |
+| `captured` | `{"size": ...}` | 采集到指纹 |
+| `success` | `{"user_id": ..., "score": ...}` | 验证通过 (绿灯) |
+| `failed` | `{"reason": ..., "error": ...}` | 验证失败/超时/设备异常 (红灯) |
+| `enroll_start` | `{"user_id": ...}` | 开始登记 (白灯亮) |
+| `enroll_progress` | `{"done": ..., "total": ...}` | 每次采集合并时 |
+| `enroll_done` | `{"user_id": ..., "size": ...}` | 登记完成 (绿灯) |
 
 ```python
 from pyzk20r import FingerprintDB, FingerprintSession, Scanner
@@ -155,14 +186,17 @@ ZKFPMError (含 .code 原始 SDK 错误码)
 
 - `Scanner.on_enroll_progress(done, total)` — 登记进度钩子
 - `Scanner.try_acquire(params=None)` — 采集前后的自定义处理 (如防假判定重试); 覆写请保留可选 `params` 参数 (v0.1.4 及之前为私有名 `_try_acquire`)
-- `Scanner` / `FingerprintDB` 所有公开方法均可覆写
+- `FingerprintSession.on_event(event, data=None)` — 会话事件回调 (灯效/提示音/弹窗等)
+- `Scanner` / `FingerprintDB` / `FingerprintSession` 所有公开方法均可覆写
 
 ### 线程模型
 
 本库是**同步设计**: 无内部线程。全局 Init/Terminate 引用计数有线程锁保护,
 多线程**构造/关闭**设备与算法库是安全的; 但单个 `Scanner` / `FingerprintDB`
-实例的操作仍不加锁——请勿多线程并发使用同一实例 (并发采集/比对),
-需要后台采集请在承载线程内独占一个 `Scanner`。
+/ `FingerprintSession` 实例的操作仍不加锁——请勿多线程并发使用同一实例
+(并发采集/比对), 需要后台采集请在承载线程内独占一个 `Scanner`。
+会话层的 `wait_login` / `wait_enroll` 是**阻塞调用** (等待手指), 会占用
+当前线程。
 
 ### 安全提示
 
@@ -177,7 +211,7 @@ ZKFPMError (含 .code 原始 SDK 错误码)
 ```python
 import json
 
-data = db.dump()  # {"version": 1, "templates": [[uid, "BASE64"], ...]}
+data = db.dump()  # {"version": 2, "templates": [[uid, "BASE64"], ...]}
 json.dump(data, open("fingers.json", "w"))
 
 db = FingerprintDB.load(json.load(open("fingers.json")))  # 启动时重建, 无需重新按手指
@@ -357,20 +391,20 @@ SDK 文档 (中英文 PDF + 头文件 + MFC Demo) 从 ZKTeco 官网 / "ZKFinger 
 
 ```bash
 # 一条命令: 升版本号 (三处同步) + 提交版本文件 + 打 annotated tag
-python scripts/version.py release 0.1.3
+python scripts/version.py release 0.1.5
 
 # 推送 (推 tag 即触发 GitHub Actions 发布 PyPI)
-git push origin main && git push origin v0.1.3
-git push gitee main && git push gitee v0.1.3
+git push origin main && git push origin v0.1.5
+git push gitee main && git push gitee v0.1.5
 ```
 
 其它子命令:
 
 ```bash
 python scripts/version.py check          # 校验四处一致 (CI 也跑这条)
-python scripts/version.py bump 0.1.3      # 只升版本号, 不提交不打 tag
+python scripts/version.py bump 0.1.5      # 只升版本号, 不提交不打 tag
 python scripts/version.py sync            # 把版本号同步为最新 tag 的版本
-python scripts/version.py tag v0.1.3      # 校验通过后打 tag
+python scripts/version.py tag v0.1.5      # 校验通过后打 tag
 ```
 
 CI 的 `version` job 与 `release` 工作流都会执行 `check`: 任何一处版本号对不上,

@@ -13,6 +13,17 @@
     with Scanner() as dev:
         db.enroll(dev, user_id="A001")               # 登记一枚指纹 (采 3 次, 工号为字符串)
         uid, score = db.identify(dev.acquire().template)
+
+工业终端一键流程 (等待手指 -> 采集 -> 比对 -> 灯效反馈)::
+
+    from pyzk20r import FingerprintDB, FingerprintSession, Scanner
+
+    db = FingerprintDB()
+    with Scanner() as dev:
+        with FingerprintSession(db, dev) as session:
+            result = session.wait_login(timeout=30)  # 白灯引导, 绿=通过 / 红=失败
+            if result.ok:
+                print("工号:", result.user_id)
 """
 
 from . import _binding

@@ -112,6 +112,22 @@ class TestDevice(FakeDLLTestCase):
         self.assertEqual(info.serial, "SN12345678")
         self.assertEqual(info.vid_pid, "VID_1B55 PID_0223")
 
+    def test_param_read_never_exceeds_buffer(self):
+        """SDK 写入的字节数不得超过调用方给的缓冲区大小。
+
+        回归: FakeDLL 曾把 257 字节的字符串参数写进 256 字节缓冲区, 越界
+        1 字节, 在 32 位 Python 3.4 上表现为堆损坏 (0xC0000374) 随机崩溃。
+        """
+        with Scanner() as dev:
+            dev.info()
+            dev.get_param_bytes(1101, 16)
+        for code, capacity, written in self.fake_dll.param_reads:
+            self.assertLessEqual(
+                written,
+                capacity,
+                "parameter {:d} wrote {:d} bytes into a {:d}-byte buffer".format(code, written, capacity),
+            )
+
     def test_acquire_returns_frame(self):
         with Scanner() as dev:
             frame = dev.acquire()

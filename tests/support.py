@@ -30,6 +30,7 @@ class FakeDLL:
         self.acquire_fail = None  # 非 None 时持续返回该错误码 (脚本化"始终无手指/故障")
         self.set_params = {}  # code -> bytes
         self.set_param_ret = 0  # ZKFPM_SetParameters 返回码 (可设为 -5 模拟不支持)
+        self.param_reads = []  # (code, 缓冲区大小, 实际写入字节数) 用于断言不越界
         self.db_adds = {}  # fid -> bytes
         self.db_params = {1: 50, 2: 70}  # 阈值 (SDK 文档默认 50 / 70)
         self.db_ident_result = (1, 99)  # (fid, score)
@@ -69,13 +70,15 @@ class FakeDLL:
     def _param_data(self, code):
         # 参数码严格对齐 SDK 附录 1 (PDF 6.1): 101/102/103 灯效(只写),
         # 1101/1102/1103 字符串(只读), 10001 模板格式, 10002 模板质量
+        # 字符串数据长度必须正好 256 (= Scanner._PARAM_STR_BUF), 否则
+        # 写进调用方缓冲区时越界 (曾导致 32 位 Python 3.4 堆损坏)
         return {
             1: struct.pack("<i", WIDTH),
             2: struct.pack("<i", HEIGHT),
             3: struct.pack("<i", DPI),
             106: struct.pack("<i", WIDTH * HEIGHT),
-            1101: b"ZKTeco Inc\x00" + b"\x00" * 246,
-            1102: b"Live20R\x00" + b"\x00" * 249,
+            1101: b"ZKTeco Inc\x00" + b"\x00" * 245,
+            1102: b"Live20R\x00" + b"\x00" * 248,
             1103: b"SN12345678\x00" + b"\x00" * 245,
             1015: struct.pack("<HH", 0x1B55, 0x0223),
             2002: struct.pack("<i", 1),
@@ -87,6 +90,11 @@ class FakeDLL:
 
     def ZKFPM_GetParameters(self, handle, code, buf, pn):
         data = self.set_params.get(int(code)) or self._param_data(int(code))
+        # 真实 SDK 遵守调用方给的缓冲区大小 (cbParamValue[in]); 这里同样裁剪,
+        # 防止替身写出越界 (曾把 32 位 Python 3.4 打成堆损坏)
+        capacity = ctypes.cast(pn, ctypes.POINTER(ctypes.c_uint)).contents.value
+        data = data[:capacity]
+        self.param_reads.append((int(code), capacity, len(data)))
         ctypes.memmove(buf, data, len(data))
         ctypes.cast(pn, ctypes.POINTER(ctypes.c_uint)).contents.value = len(data)
         return 0

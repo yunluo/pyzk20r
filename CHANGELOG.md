@@ -7,6 +7,16 @@
 
 ### 修复
 
+- **测试替身 FakeDLL 的越界写 (32 位 Python 3.4 堆损坏根因)**:
+  `FakeDLL.ZKFPM_GetParameters` 把 257 字节的字符串参数 (厂商/产品名/
+  序列号) 写进调用方给的 256 字节缓冲区, 越界 1 字节, 在 32 位 Python
+  3.4 上表现为随机位置的原生崩溃 (0xC0000374 堆损坏), 与被测代码无关。
+  修正: 字符串参数数据长度对齐到 256, 且 FakeDLL 现在遵守调用方给的
+  缓冲区大小 (与真实 SDK 的 cbParamValue[in] 语义一致); 另加回归测试
+  断言写入字节数不超过缓冲区大小。修复前 `test_info` 单跑崩 5/6, 修复后
+  3.4 整套连跑 10 次全过
+- `Scanner.get_param_bytes` 增加长度防线: 固件回报的长度超过请求的缓冲区
+  时按缓冲区大小截断, 不读取缓冲区之外的内存
 - `FingerprintDB.dump` 文档示例版本号 1 → 2 (代码实际写 v2, `load` 兼容读 v1)
 - **设备参数码全面纠正 (SDK 附录 1 / PDF 6.1 逐码核对)**:
   `Param` 原先把 101/102/103 (只写灯效) 与 1101/1102/1103 (只读字符串)、
@@ -26,6 +36,7 @@
   拒绝而不透传给 SDK); 默认值依机型而定 (文档标称 ZKFinger10.0 为 50/70,
   实测 Live20R 为 45/60)
 - `ZKFPM_GetDeviceCount` 返回负值 (接口调用失败) 时不再误报为"无设备连接"
+- README 的 `dump()` 示例版本号 1 → 2 (与实际结构一致)
 - 诊断脚本 `scripts/diag_led.py` / `scripts/diag_params.py` /
   `scripts/diag_beep.py` / `scripts/diag_exports.py` / `scripts/diag_restore.py`:
   换机型/固件时逐项核对灯效、蜂鸣、参数码与导出表
@@ -60,6 +71,12 @@
   灯效 (示例只保留业务与存储: SQLite 落盘 + `do_login` 对接点), 并演示
   `on_event` 事件回调; 菜单序号调整为 [1] 登记员工指纹 / [2] 指纹登录 /
   [3] 删除员工
+- README 补齐会话层文档 (API 表 / reason 表 / 事件表 / 快速上手示例 /
+  流程图与时序图), 并补上此前遗漏的低层 API (通用参数读写 / `capture_params`
+  / `closed` / `emit`); 包 `__init__` docstring 增加会话层快速上手
+- `scripts/test_all.bat`: 3.4 缺少 OK 摘要时自动重试 (最多 3 次尝试),
+  规避环境瞬态崩溃造成的假失败; 文件统一 CRLF 换行 (cmd 的 `goto` 标签在
+  LF-only 文件里无法解析)
 
 ## v0.1.4 (2026-11-15)
 

@@ -173,13 +173,19 @@ class Scanner:
     # -- 参数 ---------------------------------------------------------------
 
     def get_param_bytes(self, code: int, size: int) -> bytes:
-        """读取参数原始字节。"""
+        """读取参数原始字节。
+
+        ``size`` 是请求的缓冲区大小 (SDK 语义: cbParamValue[in]); 返回值
+        只取实际写入的前 ``size`` 字节——即使固件回报了异常的长度, 也不会
+        越界读取缓冲区之外的内存。
+        """
         handle = self._require_open()
         buf = ctypes.create_string_buffer(size)
         n = ctypes.c_uint(size)
         ret = _binding.get_dll().ZKFPM_GetParameters(handle, int(code), buf, ctypes.byref(n))
         raise_for(ret, "failed to get parameter {:d}".format(code), DeviceError)
-        return buf.raw[: n.value]
+        length = n.value if n.value <= size else size  # 防御: 固件回报长度越界
+        return buf.raw[:length]
 
     def get_param_int(self, code: int) -> int:
         """读取 int 型参数。"""
