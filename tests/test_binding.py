@@ -1,7 +1,6 @@
 # -*- coding: utf-8 -*-
 """DLL 定位与加载测试。"""
 import os
-import struct
 
 import pytest
 
@@ -23,22 +22,15 @@ def test_explicit_overrides_env(monkeypatch):
     assert _binding.resolve_dll_path(r"C:\explicit.dll") == r"C:\explicit.dll"
 
 
-def test_resolve_prefers_system_over_bundled():
-    """驱动装好的机器上应返回 System32 绝对路径 (防裸名劫持); 无系统副本才回退包内。"""
+def test_resolve_prefers_system_absolute_path():
+    """驱动装好的机器上返回 System32 绝对路径 (防裸名劫持); 否则裸名交给系统搜索。"""
     path = _binding.resolve_dll_path()
     assert path.endswith("libzkfp.dll")
     system32 = os.path.join(os.environ.get("SystemRoot", r"C:\Windows"), "System32", "libzkfp.dll")
     if os.path.exists(system32):
         assert path == system32                       # 绝对路径, 不用裸名
     else:
-        assert os.path.sep in path and "dlls" in path
-
-
-def test_bundled_dll_arch_matches_python():
-    """包内捆绑的 DLL 必须存在, 且与当前 Python 位数一致 (回退场景用)。"""
-    arch = "x64" if struct.calcsize("P") == 8 else "x86"
-    path = os.path.join(os.path.dirname(_binding.__file__), "dlls", arch, "libzkfp.dll")
-    assert os.path.exists(path)
+        assert path == "libzkfp.dll"
 
 
 def test_load_real_dll_sets_prototypes():

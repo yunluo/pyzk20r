@@ -6,7 +6,7 @@
 
 - **零第三方依赖**, 纯标准库
 - 支持 **Windows XP / Python 3.4+** (单一代码库, 语法兼容 3.4, 类型为 PEP 484 注释式标注)
-- 优先加载驱动安装的系统 DLL, 包内另捆绑 x86 / x64 `libzkfp.dll` 兜底 (见下)
+- 使用驱动安装的系统 DLL (不捆绑分发, 见 DLL 查找顺序)
 - 同步阻塞 + 生成器式持续采集; 无内部线程, 单线程使用; 方法粒度小, 便于子类覆写
 - **一人多指纹** 模型: `user_id` 可登记多枚指纹, 识别直接返回用户
 
@@ -16,10 +16,10 @@
 pip install pyzk20r
 ```
 
-> 目标机器仍需安装 Live20R/SLK20R 的 USB 驱动 (libusb0, 设备才能被枚举), 驱动安装器
-> 同时会把 libzkfp.dll 及其依赖链 (ZKFPCap.dll、zkfinger12.dll、ZKFPSensors\*.dll)
-> 装进 System32/SysWOW64 —— **库默认优先加载系统副本**, 因为 libzkfp.dll 的内部依赖
-> 按其自身所在目录解析, 包内捆绑的单独副本无法独立工作 (仅作无系统副本时的兜底)。
+> 目标机器必须安装 Live20R/SLK20R 的驱动 (libusb0 USB 驱动 + SDK 运行库)。驱动安装器会把
+> libzkfp.dll 及其依赖链 (ZKFPCap.dll、zkfinger12.dll、ZKFPSensors\*.dll) 装进
+> System32/SysWOW64, 本库直接加载系统副本 —— libzkfp.dll 的内部依赖按其自身所在目录解析,
+> 单独拷贝一个 DLL 无法工作, 因此**本库不捆绑分发 DLL**。
 > 也可用环境变量 `PYZK20R_DLL` 或 `Scanner(dll_path=...)` 显式指定 `libzkfp.dll` 路径。
 
 ## 快速上手
@@ -120,9 +120,9 @@ ZKFPMError (含 .code 原始 SDK 错误码)
 
 1. `Scanner(dll_path=...)` / `FingerprintDB(dll_path=...)` 显式指定
 2. 环境变量 `PYZK20R_DLL`
-3. 系统副本 (驱动安装后的 `C:\Windows\System32` / `SysWOW64`, **推荐**)
-4. 包内捆绑 `pyzk20r/dlls/<arch>/libzkfp.dll` (兜底; 注意单独的 libzkfp.dll
-   缺少依赖链时无法初始化, 完整依赖在驱动安装目录)
+3. 系统副本 `C:\Windows\System32\libzkfp.dll` (32 位 Python 下经 WOW64 重定向即 SysWOW64;
+   需先安装驱动, 完整依赖链在系统目录)
+4. 兜底: 裸名 `libzkfp.dll` 交给 Windows 搜索 (PATH 中)
 
 > 未安装许可文件 `zkfinger.lic` 时 SDK 会打印许可警告但功能可用 (算法 v12)。
 
@@ -146,8 +146,9 @@ uv run mypy                       # 类型检查 (注释式标注)
 
 dev 工具由 `[dependency-groups]` 提供 (pytest / ruff / mypy), `uv run` 自动同步。
 
-SDK 文档见 `doc/ZKFinger SDK 5.0.0.34/c/` (中英文 PDF + 头文件 + MFC Demo)。
+SDK 文档 (中英文 PDF + 头文件 + MFC Demo) 从 ZKTeco 官网 / "ZKFinger SDK" 安装包获取;
+本库的接口注释即按其 C API 编写。
 
 ## License
 
-MIT (见 LICENSE)。`libzkfp.dll` 版权归 ZKTeco 所有, 仅供配合其设备使用。
+MIT (见 LICENSE)。ZKFinger SDK 及 `libzkfp.dll` 版权归 ZKTeco 所有, 需随官方驱动获取, 仅供配合其设备使用。

@@ -12,7 +12,6 @@ from __future__ import absolute_import
 import ctypes
 import enum
 import os
-import struct
 
 from .exceptions import ZKFPMError
 
@@ -97,22 +96,13 @@ class DBParam(enum.IntEnum):
 # DLL 加载
 # ---------------------------------------------------------------------------
 
-def _bundled_path():
-    # type: () -> Optional[str]
-    """包内捆绑 DLL 的路径 (按当前 Python 位数选 x86/x64), 不存在则返回 None。"""
-    arch = "x64" if struct.calcsize("P") == 8 else "x86"
-    path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "dlls", arch, _DLL_NAME)
-    return path if os.path.exists(path) else None
-
-
 def resolve_dll_path(explicit=None):
     # type: (Optional[str]) -> str
-    """按 显式指定 -> 环境变量 -> 系统 -> 包内捆绑 的顺序定位 DLL。
+    """按 显式指定 -> 环境变量 -> 系统 的顺序定位 DLL。
 
-    优先系统副本: libzkfp.dll 的内部依赖 (ZKFPCap.dll -> fppswsk12.dll ->
+    依赖系统副本: libzkfp.dll 的内部依赖 (ZKFPCap.dll -> fppswsk12.dll ->
     zkfinger12.dll 及 ZKFPSensors 插件目录) 按 libzkfp.dll 自身所在目录
-    解析, 单独把 libzkfp.dll 拷进包内会导致依赖链断裂 (Init 失败)。
-    驱动安装后 System32/SysWOW64 是完整依赖链, 因此系统副本最可靠。
+    解析, 必须使用驱动安装的完整依赖链, 本库不单独分发 DLL。
     """
     if explicit:
         return explicit
@@ -125,10 +115,7 @@ def resolve_dll_path(explicit=None):
     system32 = os.path.join(os.environ.get("SystemRoot", r"C:\Windows"), "System32", _DLL_NAME)
     if os.path.exists(system32):
         return system32
-    bundled = _bundled_path()
-    if bundled:
-        return bundled
-    return _DLL_NAME
+    return _DLL_NAME                             # 兜底: 交给系统搜索 (SysWOW64/PATH)
 
 
 def load_dll(path=None):
