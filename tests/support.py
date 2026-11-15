@@ -10,7 +10,7 @@ import unittest
 # unittest 不经过 src 布局的安装也能跑: 把仓库的 src/ 插到搜索路径最前
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "src"))
 
-from pyzk20r import _binding  # noqa: E402
+from pyzk20r import Param, _binding  # noqa: E402
 
 WIDTH, HEIGHT, DPI = 256, 360, 500
 TEMPLATE = bytes(range(1, 65))  # 64 字节假模板
@@ -190,6 +190,30 @@ class FakeDLL:
 
     def ZKFPM_GetTemplateQuality(self, handle, buf, cb):
         return 85
+
+
+class LEDRecordingDLL(FakeDLL):
+    """记录 LED 参数写入序列 (code, value), 断言灯效反馈行为。"""
+
+    def __init__(self):
+        super(LEDRecordingDLL, self).__init__()
+        self.led_writes = []
+
+    def ZKFPM_SetParameters(self, handle, code, buf, cb):
+        ret = FakeDLL.ZKFPM_SetParameters(self, handle, code, buf, cb)
+        code = int(code)
+        if code in (Param.LED_WHITE, Param.LED_GREEN, Param.LED_RED):
+            self.led_writes.append((code, struct.unpack("<i", buf.raw[:cb])[0]))
+        return ret
+
+
+class UnsupportedLEDDLL(LEDRecordingDLL):
+    """模拟不支持灯效的机型: LED 参数写入一律失败 (防御性用例)。"""
+
+    def ZKFPM_SetParameters(self, handle, code, buf, cb):
+        if int(code) in (Param.LED_WHITE, Param.LED_GREEN, Param.LED_RED):
+            return -17  # SDK 通用失败
+        return LEDRecordingDLL.ZKFPM_SetParameters(self, handle, code, buf, cb)
 
 
 class FakeDLLTestCase(unittest.TestCase):

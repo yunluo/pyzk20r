@@ -30,6 +30,16 @@ from .exceptions import (
     MergeError,
     ZKFPMError,
 )
+from .session import (
+    REASON_DEVICE_ERROR,
+    REASON_ENROLLED,
+    REASON_NO_MATCH,
+    REASON_NOT_ENROLLED,
+    REASON_OK,
+    REASON_TIMEOUT,
+    FingerprintSession,
+    SessionResult,
+)
 
 __version__ = "0.1.4"
 
@@ -39,11 +49,21 @@ __all__ = [
     "Frame",
     "DeviceInfo",
     "FingerprintDB",
+    # 指纹会话 (可选高阶封装)
+    "FingerprintSession",
+    "SessionResult",
     # 枚举
     "ZKFPErr",
     "Param",
     "DBParam",
     "MAX_TEMPLATE_SIZE",
+    # 结果原因常量
+    "REASON_OK",
+    "REASON_ENROLLED",
+    "REASON_NOT_ENROLLED",
+    "REASON_NO_MATCH",
+    "REASON_TIMEOUT",
+    "REASON_DEVICE_ERROR",
     # 异常
     "ZKFPMError",
     "DeviceError",

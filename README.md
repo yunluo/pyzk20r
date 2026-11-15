@@ -94,6 +94,49 @@ with Scanner() as dev:
 | `threshold_1_1 / threshold_1_n` (可读写) | 比对阈值 (范围 0~1000, 越界直接拒绝); 默认值依机型而定, 实测 Live20R 为 45/60 |
 | `extract_from_image(path, dpi=500)` | 从 BMP 提取模板 (仅 SDK 标准版) |
 
+### `FingerprintSession(db, scanner, lights=True, on_event=None)` — 指纹会话 (可选高阶封装)
+
+把「等待手指 → 采集 → 比对 → 灯效反馈」编排成一步到位, 面向工业终端这类
+"有人站在机器前"的场景。**不拥有** `db`/`scanner` (只借用, `close()` 只熄灯)。
+
+| 成员 | 说明 |
+| --- | --- |
+| `wait_login(timeout=None, poll_interval=0.15, user_id=None)` | 等手指 → 采集 → 比对 → 灯效; `user_id=None` 走 1:N 识别 (返回工号), 给定工号走 1:1 验证 (返回分数) |
+| `wait_enroll(user_id, timeout=None, poll_interval=0.15)` | 等手指 → 采 3 次 → 合并 → 入库 → 灯效 |
+| `on_event(event, data=None)` | 事件回调钩子 (可覆写); 构造参数 `on_event` 优先 |
+| `close()` / `with` | 熄灭全部三色灯 (可重复调用) |
+
+灯效规则: **等待手指白灯常亮 → 成功绿灯 → 失败/超时/异常红灯** (绿/红亮
+`FLASH_SECONDS` 秒后自动熄灭回到等待态)。灯效写入失败会静默降级, 绝不阻断
+验证主流程。
+
+失败不抛异常, 一律返回 `SessionResult(ok, reason, user_id, score)`:
+
+| `reason` | 含义 |
+| --- | --- |
+| `REASON_OK` | 验证通过 (`user_id`/`score` 有值) |
+| `REASON_ENROLLED` | 登记成功 |
+| `REASON_NOT_ENROLLED` | 库里没有登记任何指纹 (先注册, 后使用) |
+| `REASON_NO_MATCH` | 采到指纹但未匹配 |
+| `REASON_TIMEOUT` | 等待手指超时 |
+| `REASON_DEVICE_ERROR` | 设备/算法库错误 |
+
+事件名: `wait_start` / `captured` / `success` / `failed` / `enroll_start` /
+`enroll_progress` / `enroll_done`。
+
+```python
+from pyzk20r import FingerprintDB, FingerprintSession, Scanner
+
+db = FingerprintDB()
+with Scanner() as dev:
+    with FingerprintSession(db, dev) as session:
+        result = session.wait_login(timeout=30)
+        if result.ok:
+            print("工号:", result.user_id)
+        else:
+            print("失败:", result.reason)
+```
+
 ### 异常层级
 
 ```
@@ -150,7 +193,7 @@ SQLite 存取完整示例见 `examples/persist.py`。
 | `examples/enroll_verify.py` | 登记 + 1:1 验证 |
 | `examples/identify_1n.py` | 多人登记 + 1:N 识别循环 |
 | `examples/persist.py` | 指纹 SQLite 持久化 |
-| `examples/industrial_login.py` | **工业现场登录改造参考**: 登记工号指纹 -> 刷指纹自动登录 (含工号+密码兜底); 灯效反馈不支持时自动降级 |
+| `examples/industrial_login.py` | **工业现场登录改造参考**: 登记工号指纹 -> 刷指纹自动登录 (含工号+密码兜底); 采集/比对/灯效编排由库层 `FingerprintSession` 承担, 示例只管业务与存储 |
 
 ## 登录场景流程 (industrial_login.py)
 
@@ -169,16 +212,17 @@ flowchart TD
     end
 
     D -->|"[1] 登记员工指纹"| K["输入工号<br/>新员工建档 / 老员工追加"]
-    K --> L["按手指 3 次<br/>db.enroll: 采集 → DBMerge → 入库"]
-    L --> SG["绿灯 1.5s"] --> S["SQLite 保存<br/>save_fingerprints()"]
+    K --> L["session.wait_enroll()<br/>白灯引导 → 采 3 次 → 合并 → 入库"]
+    L -->|"失败"| FR["红灯 1.5s"] --> D
+    L -->|"成功"| SG["绿灯 1.5s"] --> S["SQLite 保存<br/>save_fingerprints()"]
     S --> Q{继续加录一枚?}
     Q -->|y| L
     Q -->|N| D
 
-    D -->|"[2] 指纹登录"| F["等待手指<br/>acquire(timeout=60)"]
-    F -->|"超时 / 采集失败"| FR["红灯 1.5s"] --> D
-    F -->|取到指纹| G["db.identify(模板)<br/>1:N 识别"]
-    G -->|"MatchError 未识别"| H["红灯 1.5s<br/>提示: 未识别<br/>请用工号+密码登录"] --> D
+    D -->|"[2] 指纹登录"| F["session.wait_login()<br/>白灯常亮 → 等待手指"]
+    F -->|"超时 / 采集失败"| FR2["红灯 1.5s"] --> D
+    F -->|取到指纹| G["1:N 识别 / 1:1 验证"]
+    G -->|"未匹配"| H["红灯 1.5s<br/>提示: 未识别<br/>请用工号+密码登录"] --> D
     G -->|"返回 (工号, 分数)"| IG["绿灯 1.5s"] --> I["do_login(工号)<br/>调用你的工业软件 API"]
     I --> OK([自动登录成功<br/>进入系统])
 
@@ -196,6 +240,7 @@ flowchart TD
 sequenceDiagram
     actor W as 员工
     participant App as 登录终端<br/>(industrial_login.py)
+    participant Sess as FingerprintSession<br/>(库层编排)
     participant DB as FingerprintDB<br/>(内存指纹库)
     participant SDK as libzkfp.dll<br/>(ZKFinger 算法)
     participant Store as SQLite<br/>workers.db
@@ -203,32 +248,39 @@ sequenceDiagram
 
     Note over App,Store: 程序启动时: load_db() 从 SQLite 重建内存库
     W->>App: 选择 [2] 指纹登录
-    App->>SDK: acquire(timeout=60) 轮询取像 (白灯固件自动点亮)
+    App->>Term: wait_login(timeout=60)
+    Sess->>SDK: 写 101=1 (白灯常亮, 引导按手指)
+    Sess->>SDK: acquire(timeout=60) 轮询取像
     W->>SDK: 按压手指
-    SDK-->>App: Frame(图像 + 模板 ~1.3KB)
-    App->>DB: identify(frame.template)
+    SDK-->>Term: Frame(图像 + 模板 ~1.3KB)
+    Sess->>SDK: 写 101=0 (关白灯)
+    Sess->>DB: identify(frame.template)
     DB->>SDK: ZKFPM_DBIdentify (1:N)
     SDK-->>DB: fid + 分数
-    DB-->>App: (工号, 分数) 或 MatchError
+    DB-->>Term: (工号, 分数) 或 MatchError
 
     alt 识别成功
-        App->>W: 绿灯 1.5s (登录成功)
+        Sess->>SDK: 写 102=1 (绿灯)
+        Sess-->>App: SessionResult(ok=True, user_id, score)
         App->>MES: do_login(工号)
         MES-->>W: 自动登录, 进入系统
+        Sess->>SDK: 写 102=0 (绿灯熄灭)
     else 未识别
-        App->>W: 红灯 1.5s (登录失败)
+        Sess->>SDK: 写 103=1 (红灯)
+        Sess-->>App: SessionResult(reason=no_match)
         App-->>W: 提示改用工号+密码登录
     else 超时 / 采集失败
-        App->>W: 红灯 1.5s
+        Sess->>SDK: 写 103=1 (红灯)
+        Sess-->>App: SessionResult(reason=timeout / device_error)
     end
 
-    Note over App,Store: 登记流程: db.enroll(采3次合并) → save_fingerprints() 写 SQLite → 重启后 load_db() 恢复
+    Note over App,Store: 登记流程: session.wait_enroll() → save_fingerprints() 写 SQLite → 重启后 load_db() 恢复
 ```
 
 > **灯效**: 图中的绿/红灯反馈在真机实测可用 (参数码 101 白 / 102 绿 /
 > 103 红, 见 SDK 附录 1)。注意这些参数是**只写**的——读取它们会返回 -5
 > (无效参数), 属正常现象, 不能用它判断灯效是否生效; 命令是否下发以
-> 写入是否成功为准。个别机型若无灯效硬件, 写入可能仍成功但无灯光, 示例
+> 写入是否成功为准。个别机型若无灯效硬件, 写入可能仍成功但无灯光, 库层
 > 对灯效失败做了容错降级 (转为纯文字提示), 不影响登录主流程。
 > 待机/采集时的白灯同时是采像照明光源, 由固件自动点亮。
 > 灯效与参数码可用 `scripts/diag_led.py` / `scripts/diag_params.py` 检测。

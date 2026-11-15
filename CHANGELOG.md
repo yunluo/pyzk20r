@@ -26,11 +26,21 @@
   拒绝而不透传给 SDK); 默认值依机型而定 (文档标称 ZKFinger10.0 为 50/70,
   实测 Live20R 为 45/60)
 - `ZKFPM_GetDeviceCount` 返回负值 (接口调用失败) 时不再误报为"无设备连接"
-- 新增诊断脚本 `scripts/diag_led.py` / `scripts/diag_params.py`
-  (参数码逐个读写探测, 便于换机型/换固件时核对)
+- 诊断脚本 `scripts/diag_led.py` / `scripts/diag_params.py` /
+  `scripts/diag_beep.py` / `scripts/diag_exports.py` / `scripts/diag_restore.py`:
+  换机型/固件时逐项核对灯效、蜂鸣、参数码与导出表
 
 ### 新增
 
+- **终端会话层 `FingerprintSession` (可选高阶封装)**: 把「等待手指 → 采集 →
+  比对 → 灯效反馈」编排成一步到位, 面向工业终端场景。灯效规则: 等待手指
+  白灯常亮 → 成功绿灯 → 失败/超时/异常红灯 (绿/红亮 1.5 秒后自动熄灭回到
+  等待态); 灯效写入失败静默降级, 绝不阻断验证主流程。提供
+  `wait_login()` (1:N 识别 / 1:1 验证) 与 `wait_enroll()` (登记), 失败不抛
+  异常而返回 `SessionResult(ok, reason, user_id, score)`; 另提供
+  `on_event` 事件钩子 (`wait_start` / `captured` / `success` / `failed` /
+  `enroll_start` / `enroll_progress` / `enroll_done`)。不拥有 db/scanner
+  (只借用, `close()` 只熄灯), 不做业务动作、不落盘、不含线程
 - `Scanner.beep(on=True)`: 蜂鸣器控制 (参数码 104, 只写)。SDK 文档标注该
   参数 "not supported by the LIVE20R", 实测 Live20R 写入返回 -5 (固件不认
   该参数)——此类机型调用会抛 `DeviceError` 并附明确说明, 不再是难以理解
@@ -46,10 +56,10 @@
 
 - `Scanner._try_acquire` 更名为公开扩展点 `Scanner.try_acquire` (0.x 窗口期
   完成; 子类覆写请改用新名, 签名保留可选 `params` 参数的约定不变)
-- examples/industrial_login.py 增加 LED 结果反馈与「先注册后使用」引导:
-  登记成功/登录成功亮绿灯, 登录失败/采集失败亮红灯 (采像白灯由固件自动
-  点亮); 登录超时与灯效时长提为模块常量 `LOGIN_TIMEOUT` / `FLASH_SECONDS`;
-  菜单序号调整为 [1] 登记员工指纹 / [2] 指纹登录 / [3] 删除员工
+- examples/industrial_login.py 改用库层 `FingerprintSession` 编排采集/比对/
+  灯效 (示例只保留业务与存储: SQLite 落盘 + `do_login` 对接点), 并演示
+  `on_event` 事件回调; 菜单序号调整为 [1] 登记员工指纹 / [2] 指纹登录 /
+  [3] 删除员工
 
 ## v0.1.4 (2026-11-15)
 
