@@ -30,7 +30,7 @@ class FakeDLL:
         self.acquire_fail = None  # 非 None 时持续返回该错误码 (脚本化"始终无手指/故障")
         self.set_params = {}  # code -> bytes
         self.db_adds = {}  # fid -> bytes
-        self.db_params = {1: 35, 2: 55}  # 阈值
+        self.db_params = {1: 50, 2: 70}  # 阈值 (SDK 文档默认 50 / 70)
         self.db_ident_result = (1, 99)  # (fid, score)
         self.db_ident_ret = 0
         self.db_ident_user_map = {}  # fid -> score (给 verify 用)
@@ -66,19 +66,21 @@ class FakeDLL:
     # -- 参数 -----------------------------------------------------------------
 
     def _param_data(self, code):
+        # 参数码严格对齐 SDK 附录 1 (PDF 6.1): 101/102/103 灯效(只写),
+        # 1101/1102/1103 字符串(只读), 10001 模板格式, 10002 模板质量
         return {
             1: struct.pack("<i", WIDTH),
             2: struct.pack("<i", HEIGHT),
             3: struct.pack("<i", DPI),
             106: struct.pack("<i", WIDTH * HEIGHT),
-            101: b"ZKTeco Inc\x00" + b"\x00" * 246,
-            102: b"Live20R\x00" + b"\x00" * 249,
-            103: b"SN12345678\x00" + b"\x00" * 245,
+            1101: b"ZKTeco Inc\x00" + b"\x00" * 246,
+            1102: b"Live20R\x00" + b"\x00" * 249,
+            1103: b"SN12345678\x00" + b"\x00" * 245,
             1015: struct.pack("<HH", 0x1B55, 0x0223),
             2002: struct.pack("<i", 1),
             2004: struct.pack("<i", 31),
-            1102: struct.pack("<i", 0),
-            1103: struct.pack("<i", 80),
+            10001: struct.pack("<i", 0),
+            10002: struct.pack("<i", 80),
             50002: struct.pack("<i", 1),
         }[code]
 

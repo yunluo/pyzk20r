@@ -123,14 +123,24 @@ class TestFingerprintDB(FakeDLLTestCase):
             self.assertEqual(db.users, [])
 
     def test_thresholds_default_and_set(self):
+        """阈值默认值 50/70 (SDK 文档 5.2.23), 可读写。"""
         with FingerprintDB() as db:
-            self.assertEqual(db.threshold_1_1, 35)
-            self.assertEqual(db.threshold_1_n, 55)
+            self.assertEqual(db.threshold_1_1, 50)
+            self.assertEqual(db.threshold_1_n, 70)
             db.threshold_1_1 = 40
             db.threshold_1_n = 60
             self.assertEqual(db.threshold_1_1, 40)
             self.assertEqual(db.threshold_1_n, 60)
             self.assertEqual(self.fake_dll.db_params, {1: 40, 2: 60})
+
+    def test_threshold_out_of_range_rejected(self):
+        """阈值超出 0~1000 直接拒绝, 不写进 SDK。"""
+        with FingerprintDB() as db:
+            with self.assertRaises(ValueError):
+                db.threshold_1_1 = -1
+            with self.assertRaises(ValueError):
+                db.threshold_1_n = 1001
+            self.assertEqual(self.fake_dll.db_params, {1: 50, 2: 70})
 
     def test_extract_from_image(self):
         with FingerprintDB() as db:

@@ -75,32 +75,37 @@ class ZKFPErr(enum.IntEnum):
 
 
 class Param(enum.IntEnum):
-    """设备参数代码 (SDK 文档附录 1, 传给 ZKFPM_Get/SetParameters)。"""
+    """设备参数代码 (SDK 文档附录 1 / PDF 6.1 Appendix 1)。
+
+    取值经厂商头文件 + SDK PDF 附录 + 真机逐码实测三方核对:
+    101/102/103/104 是只写灯效/蜂鸣, 1101/1102/1103 是只读字符串,
+    10001/10002 是模板格式/模板质量——三者不可混用。
+    """
 
     IMG_WIDTH = 1  # 只读 int  图像宽
     IMG_HEIGHT = 2  # 只读 int  图像高
-    DPI = 3  # 读写 int  图像 DPI (Live20R 可写)
+    DPI = 3  # 读写 int  图像 DPI (LIVEID20R 支持写, 儿童建议 750/1000)
     IMG_SIZE = 106  # 只读 int  图像数据大小
-    VENDOR = 101  # 只读 str  厂商信息
-    PRODUCT_NAME = 102  # 只读 str  产品名
-    SERIAL_NUMBER = 103  # 只读 str  设备序列号
-    LED_WHITE = 104  # 只写 int  1 闪白灯 / 0 关闭
-    LED_GREEN = 10001  # 只写 int  1 闪绿灯 / 0 关闭
-    LED_RED = 10002  # 只写 int  1 闪红灯 / 0 关闭
+    LED_WHITE = 101  # 只写 int  1 闪白灯 / 0 关闭
+    LED_GREEN = 102  # 只写 int  1 闪绿灯 / 0 关闭
+    LED_RED = 103  # 只写 int  1 闪红灯 / 0 关闭
+    BEEP = 104  # 只写 int  1 蜂鸣 / 0 关闭 (LIVE20R 不支持)
+    VENDOR = 1101  # 只读 str  厂商信息
+    PRODUCT_NAME = 1102  # 只读 str  产品名
+    SERIAL_NUMBER = 1103  # 只读 str  设备序列号
     VID_PID = 1015  # 只读 4字节 VID&PID (前2字节VID, 后2字节PID)
-    FAKE_SWITCH = 2002  # 读写 int  防假开关 (1 开 / 0 关)
+    FAKE_SWITCH = 2002  # 读写 int  防假开关 (1 开 / 0 关, LIVEID20R 支持写)
     FAKE_STATUS = 2004  # 只读 int  低五位全 1 表示真手指 (value & 31 == 31)
-    BEEP = 1101  # 只写 int  蜂鸣 (Live20R 不支持)
-    TEMPLATE_FORMAT = 1102  # 读写 int  0 ANSI / 1 ISO (仅 ISO/ANSI 版本)
-    TEMPLATE_QUALITY = 1103  # 只读 int  最近一次提取模板的质量
+    TEMPLATE_FORMAT = 10001  # 读写 int  0 ANSI378 / 1 ISO 19794-2 (仅 ISO/ANSI 版)
+    TEMPLATE_QUALITY = 10002  # 只读 int  最近一次采集的模板质量 0~100
     DEVICE_STATUS = 50002  # 只读 int  0 异常 / 1 正常
 
 
 class DBParam(enum.IntEnum):
-    """算法库参数代码 (传给 ZKFPM_DBSet/GetParameter)。"""
+    """算法库参数代码 (传给 ZKFPM_DBSet/GetParameter, SDK 文档 5.2.23)。"""
 
-    THRESHOLD_1_1 = 1  # 1:1 阈值, 默认 35, 范围 0~100
-    THRESHOLD_1_N = 2  # 1:N 阈值, 默认 55, 范围 0~100
+    THRESHOLD_1_1 = 1  # 1:1 阈值, 默认 50, 范围 0~1000
+    THRESHOLD_1_N = 2  # 1:N 阈值, 默认 70, 范围 0~1000
 
 
 # ---------------------------------------------------------------------------

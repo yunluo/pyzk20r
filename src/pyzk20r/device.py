@@ -29,6 +29,7 @@ from .exceptions import (
     CaptureTimeoutError,
     DeviceError,
     DeviceNotFoundError,
+    LibraryError,
     ZKFPMError,
     error_class,
     raise_for,
@@ -128,7 +129,12 @@ class Scanner:
         if self._handle is not None:
             raise ZKFPMError(ZKFPErr.ALREADY_OPENED, "device already open")
         dll = _binding.lib_addref(self._dll_path)
-        if dll.ZKFPM_GetDeviceCount() < 1:
+        count = dll.ZKFPM_GetDeviceCount()
+        if count < 0:
+            # SDK 文档: 负值表示接口调用失败, 与"无设备连接"是两回事
+            _binding.lib_release()
+            raise LibraryError(int(count), "failed to query device count")
+        if count < 1:
             _binding.lib_release()
             raise DeviceNotFoundError(ZKFPErr.NO_DEVICE, "no device connected")
         handle = dll.ZKFPM_OpenDevice(self._index)
@@ -205,7 +211,7 @@ class Scanner:
 
     @dpi.setter
     def dpi(self, value: int) -> None:
-        self.set_param_int(Param.DPI, value)  # Live20R 可写, 例如儿童指纹建议 750/1000
+        self.set_param_int(Param.DPI, value)  # 儿童指纹建议 750/1000 (文档标注 LIVEID20R 支持写)
 
     @property
     def fake_detect(self) -> bool:
@@ -226,6 +232,7 @@ class Scanner:
 
     @property
     def template_format(self) -> str:
+        """模板标准: 'ansi' (默认) / 'iso'; 写入仅 ISO/ANSI 版设备支持。"""
         return "iso" if self.get_param_int(Param.TEMPLATE_FORMAT) else "ansi"
 
     @template_format.setter
@@ -238,9 +245,9 @@ class Scanner:
     def led(self, color: str, on: bool = True) -> None:
         """控制指示灯闪烁, ``color``: 'white' / 'green' / 'red'。
 
-        灯效支持依赖固件/硬件变体: 不支持的颜色可能抛 :class:`DeviceError`
-        (实测 VID_1B55 PID_0120 的 red), 也可能接受命令但无实际灯效
-        (同一固件的 green); 白灯由固件在采集时自动点亮, 不受本参数控制。
+        灯效支持依赖硬件: 参数码 101/102/103 (只写) 在无灯效的机型上
+        写入会被接受但读回 -5 (无效参数), 即命令成功但没有实际灯光;
+        白灯由固件在采集时自动点亮, 不受本参数控制。
         """
         try:
             code = _LED_CODES[color]

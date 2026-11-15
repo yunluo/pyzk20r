@@ -79,13 +79,14 @@ class TestDevice(FakeDLLTestCase):
                 dev.template_format = "xyz"
 
     def test_led(self):
+        """灯效参数码: 101 白 / 102 绿 / 103 红 (SDK 附录 1)。"""
         with Scanner() as dev:
             dev.led("green", True)
             dev.led("red", False)
             with self.assertRaises(ValueError):
                 dev.led("blue")
-        self.assertEqual(struct.unpack("<i", self.fake_dll.set_params[10001]), (1,))
-        self.assertEqual(struct.unpack("<i", self.fake_dll.set_params[10002]), (0,))
+        self.assertEqual(struct.unpack("<i", self.fake_dll.set_params[102]), (1,))
+        self.assertEqual(struct.unpack("<i", self.fake_dll.set_params[103]), (0,))
 
     def test_info(self):
         with Scanner() as dev:

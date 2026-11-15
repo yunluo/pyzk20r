@@ -225,6 +225,45 @@ def _repo_python_sources():
 class TestSyntaxGuards(unittest.TestCase):
     """源码风格与语法下限守卫。"""
 
+    def test_param_codes_match_sdk_appendix(self):
+        """参数码必须与 SDK 附录 1 (PDF 6.1) 一致, 不可错位。
+
+        背景: 曾把 101/102/103 (灯效) 与 1101/1102/1103 (字符串)、
+        10001/10002 (模板格式/质量) 相互写错, 导致真机上灯效无效、
+        厂商信息读成乱码、模板格式被意外切换成 ISO。
+        """
+        from pyzk20r import Param
+
+        expected = {
+            "IMG_WIDTH": 1,
+            "IMG_HEIGHT": 2,
+            "DPI": 3,
+            "IMG_SIZE": 106,
+            "LED_WHITE": 101,
+            "LED_GREEN": 102,
+            "LED_RED": 103,
+            "BEEP": 104,
+            "VENDOR": 1101,
+            "PRODUCT_NAME": 1102,
+            "SERIAL_NUMBER": 1103,
+            "VID_PID": 1015,
+            "FAKE_SWITCH": 2002,
+            "FAKE_STATUS": 2004,
+            "TEMPLATE_FORMAT": 10001,
+            "TEMPLATE_QUALITY": 10002,
+            "DEVICE_STATUS": 50002,
+        }
+        for name, code in expected.items():
+            with self.subTest(param=name):
+                self.assertEqual(int(getattr(Param, name)), code)
+
+    def test_param_codes_unique(self):
+        """参数码不得重复 (重复意味着两个语义共用了同一个码)。"""
+        from pyzk20r import Param
+
+        codes = [int(member) for member in Param]
+        self.assertEqual(len(codes), len(set(codes)))
+
     def test_no_percent_string_formatting(self):
         """禁止 % 风格字符串格式化, 一律使用 str.format()。
 

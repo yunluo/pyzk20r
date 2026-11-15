@@ -67,7 +67,7 @@ with Scanner() as dev:
 | `fake_detect` (可读写) | 防假指纹开关 |
 | `finger_is_live` | 最近一次采集是否真手指 (`value & 31 == 31`) |
 | `info()` | `DeviceInfo(vendor, product, serial, vid_pid)` |
-| `led('white'/'green'/'red', on)` | 指示灯 (**灯效依赖固件**: 不支持的颜色抛 `DeviceError` 或静默无效, 如实测 VID_1B55 PID_0120 无可编程三色灯; 白灯采集时固件自动点亮) |
+| `led('white'/'green'/'red', on)` | 指示灯 (参数码 101/102/103, **只写**; 依赖硬件: 无灯效机型上写入被接受但读回 -5, 即命令成功而无实际灯光; 白灯采集时固件自动点亮) |
 | `template_format` (`'ansi'/'iso'`, 可读写) | 模板标准 |
 | `template_quality(template)` | 模板质量分 |
 | `device_ok` | 设备状态 |
@@ -90,7 +90,7 @@ with Scanner() as dev:
 | `remove(user_id[, template])` | 删除某用户的全部/指定指纹 |
 | `clear() / count / users / fingers_of(user_id)` | 库管理 |
 | `dump() / load(data)` | 持久化契约: 导出/重建 JSON 兼容结构 (存储介质与时机由应用层决定) |
-| `threshold_1_1 / threshold_1_n` (可读写) | 比对阈值, 默认 35 / 55 (0~100) |
+| `threshold_1_1 / threshold_1_n` (可读写) | 比对阈值 (范围 0~1000, 越界直接拒绝); 默认值依机型而定, 实测 Live20R 为 45/60 |
 | `extract_from_image(path, dpi=500)` | 从 BMP 提取模板 (仅 SDK 标准版) |
 
 ### 异常层级
@@ -224,11 +224,12 @@ sequenceDiagram
     Note over App,Store: 登记流程: db.enroll(采3次合并) → save_fingerprints() 写 SQLite → 重启后 load_db() 恢复
 ```
 
-> **灯效依赖固件**: 图中的绿/红灯反馈在支持的固件上才生效。实测部分设备
-> 变体 (如 `VID_1B55 PID_0120`) 没有可编程三色指示灯——绿灯静默无效、
-> 红灯被固件拒绝, 示例对此自动降级为纯文字提示, 登录主流程不受影响。
+> **灯效依赖硬件**: 图中的绿/红灯反馈只在有可编程指示灯的机型上生效。
+> 实测部分设备变体 (如 `VID_1B55 PID_0120`) 没有可编程指示灯——灯效参数
+> (101/102/103) 写入被接受但读回 -5 (无效参数), 即命令成功却无灯光,
+> 示例对此自动降级为纯文字提示, 登录主流程不受影响。
 > 待机/采集时的白灯是采像照明光源, 由固件自动点亮, 与 `led()` 无关。
-> 灯效硬件可用性可用 `scripts/diag_led.py` 检测。
+> 灯效与参数码可用 `scripts/diag_led.py` / `scripts/diag_params.py` 检测。
 
 ## DLL 查找顺序
 

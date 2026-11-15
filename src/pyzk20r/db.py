@@ -339,6 +339,18 @@ class FingerprintDB:
 
     # -- 阈值 -----------------------------------------------------------------
 
+    #: 阈值取值范围 (SDK 文档 5.2.23: paramValue 0~1000)
+    THRESHOLD_RANGE = (0, 1000)
+
+    @staticmethod
+    def _check_threshold(value: int) -> int:
+        """阈值范围校验 (SDK 文档 5.2.23: 0~1000)。"""
+        low, high = FingerprintDB.THRESHOLD_RANGE
+        number = int(value)
+        if not low <= number <= high:
+            raise ValueError("threshold must be in [{:d}, {:d}], got {:d}".format(low, high, number))
+        return number
+
     @staticmethod
     def _get_threshold(handle: int, code: int) -> int:
         value = ctypes.c_int()
@@ -348,28 +360,36 @@ class FingerprintDB:
 
     @property
     def threshold_1_1(self) -> int:
-        """1:1 阈值 (默认 35, 范围 0~100)。"""
+        """1:1 阈值 (范围 0~1000)。
+
+        默认值依机型而定: SDK 文档标称 ZKFinger10.0 为 50, 实测 Live20R
+        为 45——以本属性读到的实际值为准。
+        """
         return self._get_threshold(self._require_open(), DBParam.THRESHOLD_1_1)
 
     @threshold_1_1.setter
     def threshold_1_1(self, value: int) -> None:
         raise_for(
             _binding.get_dll(self._dll_path).ZKFPM_DBSetParameter(
-                self._require_open(), int(DBParam.THRESHOLD_1_1), int(value)
+                self._require_open(), int(DBParam.THRESHOLD_1_1), self._check_threshold(value)
             ),
             "failed to set 1:1 threshold",
         )
 
     @property
     def threshold_1_n(self) -> int:
-        """1:N 阈值 (默认 55, 范围 0~100)。"""
+        """1:N 阈值 (范围 0~1000)。
+
+        默认值依机型而定: SDK 文档标称 ZKFinger10.0 为 70, 实测 Live20R
+        为 60——以本属性读到的实际值为准。
+        """
         return self._get_threshold(self._require_open(), DBParam.THRESHOLD_1_N)
 
     @threshold_1_n.setter
     def threshold_1_n(self, value: int) -> None:
         raise_for(
             _binding.get_dll(self._dll_path).ZKFPM_DBSetParameter(
-                self._require_open(), int(DBParam.THRESHOLD_1_N), int(value)
+                self._require_open(), int(DBParam.THRESHOLD_1_N), self._check_threshold(value)
             ),
             "failed to set 1:N threshold",
         )
