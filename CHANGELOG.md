@@ -19,6 +19,9 @@
 
 - `Scanner._try_acquire` 更名为公开扩展点 `Scanner.try_acquire` (0.x 窗口期
   完成; 子类覆写请改用新名, 签名保留可选 `params` 参数的约定不变)
+- examples/industrial_login.py 增加 LED 结果反馈与「先注册后使用」引导:
+  登记成功/登录成功亮绿灯, 登录失败/采集失败亮红灯 (采像白灯由固件自动
+  点亮); 登录超时与灯效时长提为模块常量 `LOGIN_TIMEOUT` / `FLASH_SECONDS`
 
 ## v0.1.4 (2026-11-15)
 

@@ -27,6 +27,7 @@ class FakeDLL:
         self.init_ret = 0
         self.opened_index = None
         self.acquire_queue = []  # 0/元组=成功, 负数=错误码
+        self.acquire_fail = None  # 非 None 时持续返回该错误码 (脚本化"始终无手指/故障")
         self.set_params = {}  # code -> bytes
         self.db_adds = {}  # fid -> bytes
         self.db_params = {1: 35, 2: 55}  # 阈值
@@ -99,6 +100,8 @@ class FakeDLL:
     # -- 采集 -----------------------------------------------------------------
 
     def _pop_acquire(self):
+        if self.acquire_fail is not None:
+            return self.acquire_fail
         if not self.acquire_queue:
             return ("ok", IMAGE[: WIDTH * HEIGHT], TEMPLATE)
         item = self.acquire_queue.pop(0)

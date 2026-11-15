@@ -2,14 +2,21 @@
 """整合流程测试: 登记 -> 识别 -> 验证 全链路 (FakeDLL 注入) 与语法守卫 (unittest)。"""
 
 import ast
+import contextlib
+import importlib.machinery
+import io
 import os
+import struct
 import sys
+import types
 import unittest
+from unittest import mock
 
 import support  # noqa: F401  (引导 src 到 sys.path)
-from support import MERGED, TEMPLATE, FakeDLLTestCase
+from support import MERGED, TEMPLATE, FakeDLL, FakeDLLTestCase
 
-from pyzk20r import FingerprintDB, Scanner
+from pyzk20r import FingerprintDB, Scanner, _binding
+from pyzk20r._binding import Param
 
 REPO_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 PKG_DIR = os.path.join(REPO_DIR, "src", "pyzk20r")
@@ -59,6 +66,110 @@ class TestEnrollIdentifyFlow(FakeDLLTestCase):
             self.assertEqual(db.count, 2)
             self.assertEqual(db.fingers_of("1001"), [MERGED, MERGED])
             self.assertEqual(db.users, ["1001"])
+        db.close()
+
+
+# ---------------------------------------------------------------------------
+# examples/industrial_login.py 契约: 先注册 -> 后使用 -> 登记绿灯/登录绿灯/失败红灯
+# ---------------------------------------------------------------------------
+
+
+class LEDRecordingDLL(FakeDLL):
+    """记录 LED 参数写入序列 (code, value), 断言示例的灯效反馈行为。"""
+
+    def __init__(self):
+        super(LEDRecordingDLL, self).__init__()
+        self.led_writes = []
+
+    def ZKFPM_SetParameters(self, handle, code, buf, cb):
+        ret = FakeDLL.ZKFPM_SetParameters(self, handle, code, buf, cb)
+        code = int(code)
+        if code in (Param.LED_WHITE, Param.LED_GREEN, Param.LED_RED):
+            self.led_writes.append((code, struct.unpack("<i", buf.raw[:cb])[0]))
+        return ret
+
+
+def _load_example(name):
+    """按路径加载 examples/ 脚本 (3.4 兼容, 同 test_version 的加载方式)。"""
+    path = os.path.join(REPO_DIR, "examples", name)
+    loader = importlib.machinery.SourceFileLoader(name, path)
+    module = types.ModuleType(name)
+    module.__file__ = path
+    loader.exec_module(module)
+    return module
+
+
+class TestIndustrialLoginExample(FakeDLLTestCase):
+    """工业登录示例灯效契约 (FakeDLL 记录 LED 写入序列)。"""
+
+    GREEN = [(int(Param.LED_GREEN), 1), (int(Param.LED_GREEN), 0)]  # 亮 1 -> 灭 0 一轮
+    RED = [(int(Param.LED_RED), 1), (int(Param.LED_RED), 0)]
+
+    @classmethod
+    def setUpClass(cls):
+        cls.example = _load_example("industrial_login.py")
+        cls.example.FLASH_SECONDS = 0  # 测试不真等灯效显示时长
+
+    def _led_dev(self):
+        """换入带 LED 记录的 FakeDLL 并据此构造 Scanner。"""
+        self.fake_dll = LEDRecordingDLL()
+        _binding.dll = self.fake_dll
+        return Scanner()
+
+    def test_login_before_register_guided(self):
+        """先注册后使用: 未登记任何指纹时只提示, 不采集不亮灯。"""
+        buf = io.StringIO()
+        dev = self._led_dev()
+        db = FingerprintDB()
+        with contextlib.redirect_stdout(buf):
+            self.example.finger_login(None, db, dev)
+        self.assertIn("登记", buf.getvalue())
+        self.assertEqual(self.fake_dll.led_writes, [])
+        dev.close()
+        db.close()
+
+    def test_register_then_login_green(self):
+        """登记成功绿灯; 刷指纹识别成功自动登录绿灯。"""
+        dev = self._led_dev()
+        db = FingerprintDB()
+        with mock.patch.object(self.example, "DB_FILE", ":memory:"):
+            conn = self.example.open_store()
+        with mock.patch("builtins.input", side_effect=["1001", "n"]):
+            with contextlib.redirect_stdout(io.StringIO()):
+                self.example.register_worker(conn, db, dev)
+        self.assertEqual(self.fake_dll.led_writes, self.GREEN)
+        with contextlib.redirect_stdout(io.StringIO()):
+            self.example.finger_login(conn, db, dev)  # 采集成功 -> identify(1, 99) 命中
+        self.assertEqual(self.fake_dll.led_writes, self.GREEN + self.GREEN)
+        conn.close()
+        dev.close()
+        db.close()
+
+    def test_login_no_match_red(self):
+        """识别不到 (MatchError) -> 红灯, 提示工号+密码兜底。"""
+        buf = io.StringIO()
+        dev = self._led_dev()
+        db = FingerprintDB()
+        db.enroll(dev, "1001", poll_interval=0)  # 登记不走灯效 (灯效在示例的 register_worker)
+        self.fake_dll.db_ident_ret = -20
+        with contextlib.redirect_stdout(buf):
+            self.example.finger_login(None, db, dev)
+        self.assertIn("未识别", buf.getvalue())
+        self.assertEqual(self.fake_dll.led_writes, self.RED)
+        dev.close()
+        db.close()
+
+    def test_login_capture_timeout_red(self):
+        """采集超时 (CaptureTimeoutError) -> 红灯, 不向上抛。"""
+        dev = self._led_dev()
+        db = FingerprintDB()
+        db.enroll(dev, "1001", poll_interval=0)
+        self.fake_dll.acquire_fail = -8  # 持续无手指
+        with mock.patch.object(self.example, "LOGIN_TIMEOUT", 0):  # 立即超时
+            with contextlib.redirect_stdout(io.StringIO()):
+                self.example.finger_login(None, db, dev)
+        self.assertEqual(self.fake_dll.led_writes, self.RED)
+        dev.close()
         db.close()
 
 

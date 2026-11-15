@@ -5,6 +5,8 @@
 
 - 管理端 (班组长/管理员操作): 登记工号 + 指纹 (每人可多枚), 存 SQLite
 - 登录端 (员工操作): 按指纹 -> identify 返回工号 -> 自动登录
+- 灯效反馈: 登记成功/登录成功亮绿灯, 登录失败或采集失败亮红灯
+  (采像白灯由固件在采集时自动点亮, 应用层只管结果灯)
 - 兜底: 设备缺失/手指受伤时, 保留原工号+密码登录
 
 对接你自己的工业软件: 只需实现 ``do_login(工号)`` (弹窗/HTTP/MES API 皆可);
@@ -13,10 +15,29 @@
 
 import sqlite3
 import sys
+import time
 
 from pyzk20r import FingerprintDB, MatchError, Scanner, ZKFPMError
 
 DB_FILE = "workers.db"
+
+#: 登录端等待手指的超时秒数 (无人值守防挂死, 到点抛 CaptureTimeoutError)
+LOGIN_TIMEOUT = 60
+
+#: 结果灯效显示秒数 (绿/红灯亮多久后熄灭)
+FLASH_SECONDS = 1.5
+
+
+# ============ 灯效反馈: 登记成功/登录成功绿灯, 失败红灯 ============
+
+
+def flash_led(dev, color):
+    # type: (Scanner, str) -> None
+    """亮 ``color`` 灯 FLASH_SECONDS 秒后熄灭, 作为一次操作的结果反馈。"""
+    dev.led(color)
+    time.sleep(FLASH_SECONDS)
+    dev.led(color, False)
+
 
 # ============ 对接点: 换成你的工业软件登录调用 ============
 
@@ -83,6 +104,7 @@ def register_worker(conn, db, dev):
         print("第 {:d} 枚指纹: 请按压手指 3 次...".format(len(db.fingers_of(worker_id)) + 1))
         db.enroll(dev, user_id=worker_id)  # 采 3 次 -> DBMerge -> 入库
         save_fingerprints(conn, worker_id, db.fingers_of(worker_id))
+        flash_led(dev, "green")  # 登记成功绿灯
         print("已保存 (该员工共 {:d} 枚)".format(len(db.fingers_of(worker_id))))
         again = input("继续加录一枚? (y/N): ").strip().lower()
         if again != "y":
@@ -104,17 +126,23 @@ def remove_worker(conn, db):
 
 
 def finger_login(conn, db, dev):
-    print("请按指纹 (60 秒超时)...")
+    if not db.users:
+        print("尚未登记任何指纹, 请管理员先选 [2] 登记员工指纹 (先注册, 后使用)")
+        return
+    print("请按指纹 ({} 秒超时)...".format(LOGIN_TIMEOUT))
     try:
-        frame = dev.acquire(poll_interval=0.15, timeout=60)
+        frame = dev.acquire(poll_interval=0.15, timeout=LOGIN_TIMEOUT)
     except ZKFPMError as e:
         print("采集失败: {}".format(e))
+        flash_led(dev, "red")  # 本次尝试失败红灯 (超时/设备故障)
         return
     try:
         worker_id, score = db.identify(frame.template)
     except MatchError:
+        flash_led(dev, "red")  # 登录失败红灯
         print("未识别 (阈值 {:d}), 可用工号+密码登录".format(db.threshold_1_n))
         return
+    flash_led(dev, "green")  # 登录成功绿灯
     print("识别: 工号 {}, 分数 {:d}".format(worker_id, score))
     do_login(worker_id)  # <- 自动登录
 
