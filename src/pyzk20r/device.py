@@ -261,7 +261,7 @@ class Scanner:
         buf = ctypes.create_string_buffer(bytes(template), len(template))
         ret = _binding.get_dll().ZKFPM_GetTemplateQuality(handle, buf, len(template))
         if ret < 0:
-            raise_for(ret, "获取模板质量失败", DeviceError)
+            raise_for(ret, "failed to get template quality", DeviceError)
         return ret
 
     # -- 采集 ---------------------------------------------------------------
@@ -271,7 +271,7 @@ class Scanner:
         handle = self._require_open()
         w, h, dpi = ctypes.c_int(), ctypes.c_int(), ctypes.c_int()
         ret = _binding.get_dll().ZKFPM_GetCaptureParamsEx(handle, ctypes.byref(w), ctypes.byref(h), ctypes.byref(dpi))
-        raise_for(ret, "获取采集参数失败", DeviceError)
+        raise_for(ret, "failed to get capture params", DeviceError)
         return w.value, h.value, dpi.value
 
     def acquire_image(self) -> bytes:
@@ -280,7 +280,7 @@ class Scanner:
         width, height, _dpi = self.capture_params()
         buf = ctypes.create_string_buffer(width * height)
         ret = _binding.get_dll().ZKFPM_AcquireFingerprintImage(handle, buf, width * height)
-        raise_for(ret, "取像失败")
+        raise_for(ret, "failed to acquire fingerprint image")
         return buf.raw
 
     def _try_acquire(self) -> Optional[Frame]:
@@ -329,21 +329,27 @@ class Scanner:
             elif poll_interval > 0:
                 time.sleep(poll_interval)
 
-    def enroll(self, poll_interval: float = 0.1) -> List[bytes]:
+    def enroll(self, poll_interval: float = 0.1, timeout: Optional[float] = None) -> List[bytes]:
         """连续采集 3 次 (SDK 登记合并 ZKFPM_DBMerge 固定要求 3 枚), 返回模板列表。
 
         每成功一次调用一次 :meth:`on_enroll_progress` 钩子。
+        ``timeout`` 为整个登记流程的最长等待秒数 (含所有失败重试),
+        超时抛 :class:`CaptureError`; ``None`` 表示一直等。
+        自助终端等无人值守场景务必传 timeout, 防止用户中途离开导致无限阻塞。
         """
         total = 3
+        deadline = None if timeout is None else time.monotonic() + timeout
         templates = []  # type: List[bytes]
         while len(templates) < total:
             frame = self._try_acquire()
-            if frame is None:
-                if poll_interval > 0:
-                    time.sleep(poll_interval)
+            if frame is not None:
+                templates.append(frame.template)
+                self.on_enroll_progress(len(templates), total)
                 continue
-            templates.append(frame.template)
-            self.on_enroll_progress(len(templates), total)
+            if deadline is not None and time.monotonic() >= deadline:
+                raise CaptureError(int(ZKFPErr.CAPTURE), "enroll timeout ({}s)".format(timeout))
+            if poll_interval > 0:
+                time.sleep(poll_interval)
         return templates
 
     def on_enroll_progress(self, done: int, total: int) -> None:

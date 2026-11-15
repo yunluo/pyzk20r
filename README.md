@@ -62,7 +62,7 @@ with Scanner() as dev:
 | `acquire(poll_interval=0.1, timeout=None)` | **阻塞等待手指**并采集一帧 → `Frame`; `timeout` 秒超时抛 `CaptureError` (`None` 为一直等) |
 | `capture(poll_interval=0.1)` | 持续采集生成器, 逐帧 `yield Frame` (设备关闭后下一次迭代抛 `ZKFPMError`) |
 | `acquire_image()` | 只取图像字节 |
-| `enroll(poll_interval)` | 连续采集 3 次 (SDK 合并固定要求) 返回模板列表, 每次回调 `on_enroll_progress(done, total)` |
+| `enroll(poll_interval=0.1, timeout=None)` | 连续采集 3 次 (SDK 合并固定要求) 返回模板列表, 每次回调 `on_enroll_progress(done, total)`; 无人值守场景务必传 `timeout` |
 | `width / height / dpi` (dpi 可写) | 图像规格; 儿童指纹建议 DPI 设 750/1000 |
 | `fake_detect` (可读写) | 防假指纹开关 |
 | `finger_is_live` | 最近一次采集是否真手指 (`value & 31 == 31`) |
@@ -81,7 +81,7 @@ with Scanner() as dev:
 
 | 成员 | 说明 |
 | --- | --- |
-| `enroll(scanner, user_id)` | 完整登记: 采 3 次 → 合并 → 存入该用户名下 |
+| `enroll(scanner, user_id, timeout=None)` | 完整登记: 采 3 次 → 合并 → 存入该用户名下 |
 | `add(user_id, template)` | 直接添加一枚模板 (同一 user_id 可多次) |
 | `identify(template)` | 1:N → `(user_id, score)`, 无匹配抛 `MatchError` |
 | `verify(user_id, template)` | 1:1 → 最优分数, 不匹配抛 `MatchError` |
@@ -248,8 +248,10 @@ uvx ty check                                     # 类型检查 (ty 最低支持
 `uvx` 隔离运行 (不受项目 Python 版本约束影响)。
 
 服务端 CI 不做测试, 只保留 lint/构建与版本一致性检查; 测试一律在本地
-(`scripts\test_all.bat`) 跑。真机冒烟默认关闭 (厂商 DLL 跨进程退出状态不稳定),
-连接设备后设 `PYZK20R_REAL_SMOKE=1` 开启。
+(`scripts\test_all.bat`) 跑。加载真 DLL 的测试 (真机冒烟 + DLL 加载器) 默认关闭
+——厂商 DLL 的跨进程退出状态不稳定, 连接设备后设 `PYZK20R_REAL_SMOKE=1`
+开启; 该档在部分机器 (尤其 3.4 + 32 位) 上可能崩溃测试进程, 属厂商 DLL
+已知不稳定, 不代表库本身有问题。
 
 仓库采用 **src 布局** (`src/pyzk20r/`), 包源码不在仓库根目录, 避免与测试/示例混在一起:
 

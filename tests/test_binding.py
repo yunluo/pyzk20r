@@ -10,8 +10,10 @@ from unittest import mock
 from support import FakeDLLTestCase
 
 from pyzk20r import ZKFPMError, _binding
+from pyzk20r.exceptions import LibraryError
 
 _WIN = sys.platform == "win32"
+_REAL_DLL_ENABLED = os.environ.get("PYZK20R_REAL_SMOKE") == "1"
 
 
 class TestResolveDllPath(unittest.TestCase):
@@ -44,13 +46,18 @@ class TestResolveDllPath(unittest.TestCase):
 
 
 @unittest.skipIf(not _WIN, "Windows only")
+@unittest.skipUnless(_REAL_DLL_ENABLED, "set PYZK20R_REAL_SMOKE=1 to enable (loads real DLL)")
 class TestLoadRealDll(unittest.TestCase):
-    """加载真 DLL (只声明原型, 不调 Init), 验证加载器与原型绑定。"""
+    """加载真 DLL (只声明原型, 不调 Init), 验证加载器与原型绑定。
+
+    与真机冒烟一样默认关闭: 加载过的厂商 DLL 在进程退出路径上不稳定,
+    会以随机方式带崩测试进程。
+    """
 
     def test_load_real_dll_sets_prototypes(self):
         try:
             dll = _binding.load_dll()
-        except OSError as e:
+        except ZKFPMError as e:
             raise unittest.SkipTest("libzkfp.dll unavailable (driver not installed): {}".format(e))
         for name in (
             "ZKFPM_Init",
@@ -64,8 +71,18 @@ class TestLoadRealDll(unittest.TestCase):
 
     def test_load_dll_explicit_missing(self):
         with tempfile.TemporaryDirectory() as tmp:
-            with self.assertRaises(OSError):
+            with self.assertRaises(LibraryError):
                 _binding.load_dll(os.path.join(tmp, "nope.dll"))
+
+    def test_load_dll_missing_message_has_guidance(self):
+        """加载失败必须给出可行动的排查指引 (装驱动 / VC 运行库 / PYZK20R_DLL)。"""
+        with tempfile.TemporaryDirectory() as tmp:
+            with self.assertRaises(LibraryError) as cm:
+                _binding.load_dll(os.path.join(tmp, "nope.dll"))
+            msg = str(cm.exception)
+            self.assertIn("driver", msg)
+            self.assertIn("VC++ runtime", msg)
+            self.assertIn(_binding.DLL_ENV, msg)
 
 
 class TestLibAddref(FakeDLLTestCase):

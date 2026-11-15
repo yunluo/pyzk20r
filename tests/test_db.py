@@ -250,6 +250,40 @@ class TestFingerprintDB(FakeDLLTestCase):
             with self.assertRaises(ValueError):
                 db.add("   ", TPL_A)
 
+    def test_add_rejects_bad_template(self):
+        """模板入参防御: 类型/空/超长都在调用侧报错, 不透传给 SDK。"""
+        with FingerprintDB() as db:
+            with self.assertRaises(TypeError):
+                db.add("1001", "not-bytes")
+            with self.assertRaises(ValueError):
+                db.add("1001", b"")
+            with self.assertRaises(ValueError):
+                db.add("1001", b"x" * 2049)
+            # bytearray 合法, 归一化为 bytes
+            db.add("1001", bytearray(TPL_A))
+            self.assertEqual(db.fingers_of("1001"), [TPL_A])
+            self.assertIsInstance(db.fingers_of("1001")[0], bytes)
+
+    def test_match_rejects_bad_template(self):
+        with FingerprintDB() as db:
+            with self.assertRaises(TypeError):
+                db.match("str", TPL_B)
+            with self.assertRaises(ValueError):
+                db.match(b"", TPL_B)
+            with self.assertRaises(ValueError):
+                db.identify(b"")
+
+    def test_merge_rejects_bad_template(self):
+        with FingerprintDB() as db:
+            with self.assertRaises(ValueError):
+                db.merge([TPL_A, b"", TPL_C])
+
+    def test_load_rejects_invalid_base64_chars(self):
+        """validate=True: 非 base64 字符不再被静默忽略 (损坏数据必须显式拒绝)。"""
+        data = {"version": 2, "templates": [[1, "YWJj!"]]}
+        with self.assertRaises(ValueError):
+            FingerprintDB.load(data)
+
     def test_load_accepts_v1_int_ids(self):
         """v1 持久化结构 (整数工号) 仍可读取, 载入后归一化为字符串。"""
         data = {"version": 1, "templates": [[1001, base64.b64encode(TPL_A).decode("ascii")]]}

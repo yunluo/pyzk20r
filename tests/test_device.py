@@ -2,11 +2,13 @@
 """Scanner / Frame 设备层测试 (FakeDLL 注入, 无真设备, 标准库 unittest)。"""
 
 import struct
+import threading
 import unittest
 
+import support  # noqa: F401  (引导 src 到 sys.path)
 from support import DPI, HEIGHT, IMAGE, TEMPLATE, WIDTH, FakeDLLTestCase
 
-from pyzk20r import Scanner, ZKFPErr, ZKFPMError
+from pyzk20r import Scanner, ZKFPErr, ZKFPMError, _binding
 from pyzk20r.device import Frame
 from pyzk20r.exceptions import CaptureError, DeviceNotFoundError
 
@@ -202,6 +204,62 @@ class TestDevice(FakeDLLTestCase):
         with self.assertRaises(DeviceNotFoundError) as cm:
             Scanner()
         self.assertEqual(cm.exception.code, int(ZKFPErr.NO_DEVICE))
+
+    def test_enroll_timeout_raises(self):
+        """无人值守防线: 登记超时抛 CaptureError, 不无限阻塞。"""
+        self.fake_dll.acquire_queue = [-8] * 10
+        dev = RecordingScanner()
+        with self.assertRaises(CaptureError):
+            dev.enroll(poll_interval=0, timeout=0)
+        dev.close()
+
+    def test_enroll_timeout_partial_progress(self):
+        """采到 2 枚后超时: 抛 CaptureError, 已采模板不部分返回。"""
+        self.fake_dll.acquire_queue = [0, 0, -8, -8]
+        dev = RecordingScanner()
+        with self.assertRaises(CaptureError):
+            dev.enroll(poll_interval=0, timeout=0)
+        self.assertEqual(dev.progress_calls, [(1, 3), (2, 3)])
+        dev.close()
+
+    def test_enroll_success_ignores_timeout_zero(self):
+        """登记流程一次成功就不受 timeout 影响 (超时只在等待时生效)。"""
+        self.fake_dll.acquire_queue = [0, 0, 0]
+        dev = Scanner()
+        templates = dev.enroll(poll_interval=0, timeout=0)
+        dev.close()
+        self.assertEqual(len(templates), 3)
+
+    def test_multithread_open_close_refcount(self):
+        """多线程并发构造/关闭: 引用计数加锁后不泄漏、不双重 Terminate。
+
+        所有线程先打开 40 个设备 (屏障同步), 峰值共存期间必须只 Init 一次;
+        统一关闭后归零且只 Terminate 一次。
+        """
+        errors = []
+        barrier = threading.Barrier(8)
+
+        def worker():
+            devs = []
+            try:
+                barrier.wait(10)
+                for _ in range(5):
+                    devs.append(Scanner())
+                barrier.wait(10)  # 全部打开后才允许关闭
+                for dev in devs:
+                    dev.close()
+            except Exception as e:  # pragma: no cover - 失败会被断言捕获
+                errors.append(e)
+
+        threads = [threading.Thread(target=worker) for _ in range(8)]
+        for t in threads:
+            t.start()
+        for t in threads:
+            t.join(15)
+        self.assertEqual(errors, [])
+        self.assertEqual(self.fake_dll.init_calls, 1)  # 峰值共存只 Init 一次
+        self.assertEqual(self.fake_dll.term_calls, 1)  # 全关才 Terminate 一次
+        self.assertEqual(_binding._init_refs, 0)
 
 
 if __name__ == "__main__":

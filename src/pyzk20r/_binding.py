@@ -14,8 +14,9 @@ from __future__ import absolute_import
 import ctypes
 import enum
 import os
+import threading
 
-from .exceptions import ZKFPMError
+from .exceptions import LibraryError, ZKFPMError
 
 try:
     from typing import Optional
@@ -129,8 +130,22 @@ def resolve_dll_path(explicit: Optional[str] = None) -> str:
 
 
 def load_dll(path: Optional[str] = None) -> ctypes.WinDLL:
-    """加载 libzkfp.dll 并声明全部函数原型 (stdcall)。"""
-    dll_ = ctypes.WinDLL(resolve_dll_path(path))
+    """加载 libzkfp.dll 并声明全部函数原型 (stdcall)。
+
+    加载失败 (缺驱动 / 缺 VC 运行库 / 路径不对) 抛 :class:`LibraryError`,
+    消息附排查指引; 原始 ctypes 错误文本保留在消息末尾。
+    """
+    try:
+        dll_ = ctypes.WinDLL(resolve_dll_path(path))
+    except OSError as e:
+        raise LibraryError(
+            -1,
+            "failed to load libzkfp.dll: {}. Install the ZKFinger reader driver "
+            "(via the official driver installer, it provides libzkfp.dll and all "
+            "of its dependencies into System32/SysWOW64), install the matching "
+            "VC++ runtime (x86 build for 32-bit Python), or set the {} "
+            "environment variable to the full DLL path".format(e, DLL_ENV),
+        )
     _set_prototypes(dll_)
     return dll_
 
@@ -202,23 +217,30 @@ def _set_prototypes(dll_: ctypes.WinDLL) -> None:
 #: ZKFPM_Init/ZKFPM_Terminate 的引用计数, 首次引用初始化, 归零释放
 _init_refs = 0
 
+#: 保护 _init_refs / ZKFPM_Init / ZKFPM_Terminate 的进程内互斥锁。
+#: 库的设备操作保持单线程契约不变, 这把锁只保证多线程下的
+#: 构造/关闭不会把引用计数减成负数或双重 Terminate。
+_LOCK = threading.Lock()
+
 
 def lib_addref(path: Optional[str] = None) -> ctypes.WinDLL:
     """确保 SDK 已初始化并递增引用计数, 返回 DLL。"""
     global _init_refs
     d = get_dll(path)
-    if _init_refs == 0:
-        ret = d.ZKFPM_Init()
-        if ret not in (ZKFPErr.OK, ZKFPErr.ALREADY_INIT):
-            raise ZKFPMError(int(ret), "ZKFPM_Init failed")
-    _init_refs += 1
+    with _LOCK:
+        if _init_refs == 0:
+            ret = d.ZKFPM_Init()
+            if ret not in (ZKFPErr.OK, ZKFPErr.ALREADY_INIT):
+                raise ZKFPMError(int(ret), "ZKFPM_Init failed")
+        _init_refs += 1
     return d
 
 
 def lib_release() -> None:
     """递减引用计数, 归零时释放 SDK 资源。"""
     global _init_refs
-    if _init_refs > 0:
-        _init_refs -= 1
-        if _init_refs == 0:
-            get_dll().ZKFPM_Terminate()
+    with _LOCK:
+        if _init_refs > 0:
+            _init_refs -= 1
+            if _init_refs == 0:
+                get_dll().ZKFPM_Terminate()
