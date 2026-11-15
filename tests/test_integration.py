@@ -102,3 +102,16 @@ def test_public_api_exported(name):
     import pyzk20r
     assert hasattr(pyzk20r, name)
     assert name in pyzk20r.__all__
+
+
+def test_version_consistent_with_pyproject():
+    """__init__.__version__ 与 pyproject.toml 的 version 必须一致 (防双处漂移)。"""
+    import re
+
+    import pyzk20r
+    pyproject = os.path.join(os.path.dirname(PKG_DIR), "pyproject.toml")
+    with open(pyproject, "rb") as f:
+        text = f.read().decode("utf-8")
+    match = re.search(r'(?m)^version = "(.+)"', text)
+    assert match, "pyproject.toml 缺少 version"
+    assert pyzk20r.__version__ == match.group(1)

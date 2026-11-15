@@ -225,7 +225,7 @@ sequenceDiagram
 
 - 目标机安装 **x86 版 Python 3.4** 与 Live20R/SLK20R USB 驱动
 - `pip install pyzk20r-0.1.0-py3-none-any.whl` (纯 Python wheel, 无需编译)。
-  注意: 当前构建产物为 Metadata-Version 2.5, XP 上的老版 pip 若拒绝安装,
+  注意: 构建产物为 Metadata-Version 2.4, XP 上的老版 pip 若拒绝安装,
   先升级 pip (`python -m pip install -U "pip<20"`), 或直接把 wheel 当 zip
   解包进 site-packages (纯 Python 包, 解包即用)
 - XP 下 `libzkfp.dll` 依赖系统 VC 运行库; 若加载报错, 安装 VC++ 2010/2013 运行库 (x86)
@@ -240,6 +240,16 @@ uv run mypy                       # 类型检查 (PEP 484 标注)
 ```
 
 dev 工具由 `[dependency-groups]` 提供 (pytest / ruff / mypy), `uv run` 自动同步。
+
+打包使用 uv 自家后端 (`uv_build`), 无需额外装 hatchling:
+
+```bash
+uv build                            # 生成 dist/*.whl 与 dist/*.tar.gz
+uv build --wheel                    # 只出 wheel
+```
+
+产物校验: wheel 含 `pyzk20r/` 全部模块 + `py.typed` + `dist-info/licenses/LICENSE`;
+sdist 额外含 `tests/` 与 `examples/`(指纹数据 `*.db` 自动排除)。
 
 SDK 文档 (中英文 PDF + 头文件 + MFC Demo) 从 ZKTeco 官网 / "ZKFinger SDK" 安装包获取;
 本库的接口注释即按其 C API 编写。

@@ -1,14 +1,15 @@
 [build-system]
-requires = ["hatchling"]
-build-backend = "hatchling.build"
+requires = ["uv_build>=0.8.22,<0.9.0"]
+build-backend = "uv_build"
 
 [project]
 name = "pyzk20r"
-dynamic = ["version"]
+version = "0.1.0"
 description = "ZKTeco Live20R 指纹采集器 Python 库 (ZKFinger SDK C API, 纯 ctypes, 零依赖, 支持 Windows XP / Python 3.4+)"
 readme = "README.md"
 requires-python = ">=3.4"
-license = { text = "MIT" }
+license = "MIT"
+license-files = ["LICENSE"]
 authors = [{ name = "yunluo" }]
 keywords = ["zkteco", "fingerprint", "live20r", "biometrics", "libzkfp"]
 classifiers = [
@@ -28,25 +29,17 @@ classifiers = [
 [project.urls]
 Homepage = "https://www.zksps.com/productinfo/46887.html"
 
-[tool.hatch.version]
-path = "pyzk20r/__init__.py"
-
-[tool.hatch.build.targets.wheel]
-packages = ["pyzk20r"]
+[tool.uv.build-backend]
+module-name = "pyzk20r"
+module-root = ""                             # 扁平布局: 模块在仓库根 (非 src/)
+source-include = ["tests/**", "examples/**"]  # sdist 附带测试与示例
+source-exclude = ["**/*.db"]                 # 排除指纹数据文件
 
 [dependency-groups]
 dev = [
     "pytest",
     "ruff",
     "mypy",
-]
-
-[tool.hatch.build.targets.sdist]
-include = [
-    "pyzk20r",
-    "tests",
-    "examples",
-    "README.md",
 ]
 
 [tool.pytest.ini_options]
