@@ -46,7 +46,10 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        python-version: ["3.10", "3.13"]
+        # 支持的验证版本: 3.4 / 3.7 / 3.12
+        # 3.7 单独一档 (uv 不再支持); 3.4 无 runner 镜像, 由真机 3.4.4 本地验证;
+        # 3.13 的测试进程有解释器崩溃问题, 明确不在支持范围
+        python-version: ["3.12"]
     runs-on: windows-latest                  # 本库仅支持 Windows
     steps:
       - uses: actions/checkout@v4
