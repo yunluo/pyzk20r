@@ -1,11 +1,22 @@
 name: Release PyPI
 
 # 仅 tag 推送发版: git tag v0.1.0 && git push origin v0.1.0
+# 也可手动触发 (workflow_dispatch) 补发历史版本的 GitHub Release 附件:
+#   输入 tag (如 v0.1.5) -> 只建/补 GitHub Release, 不重复发 PyPI
 on:
   push:
     tags: ["v*"]
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "要发布的 tag (补发历史版本附件时填, 如 v0.1.5); 与包版本必须一致"
+        required: true
 
 # 测试在本地跑 (scripts/test_all.bat, 3.4/3.7/3.12), 服务端只做构建校验与发布
+env:
+  # push 事件用 ref_name (tag), dispatch 事件用手动输入的 tag
+  RELEASE_TAG: ${{ github.event.inputs.tag || github.ref_name }}
+
 jobs:
   build:
     name: build & verify version
@@ -13,6 +24,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with:
+          ref: ${{ env.RELEASE_TAG }}
           fetch-depth: 0        # 需要完整 tag 历史才能发现版本漂移
       - uses: actions/setup-python@v5
         with:
@@ -22,7 +34,7 @@ jobs:
           python-version: "3.12"
       # 校验 tag 与包版本一致 (vX.Y.Z <-> pyproject version / __version__), 有漂移直接失败
       - name: verify tag matches package version
-        run: python scripts/version.py check --tag "${GITHUB_REF_NAME}"
+        run: python scripts/version.py check --tag "${RELEASE_TAG}"
       - name: build wheel + sdist
         run: uv build
       - uses: actions/upload-artifact@v4
@@ -33,6 +45,8 @@ jobs:
   publish:
     name: publish to PyPI
     needs: build
+    # 手动 dispatch 只补 GitHub Release 附件, 不重复发 PyPI (同版本不可重传)
+    if: github.event_name == 'push'
     runs-on: ubuntu-latest
     environment: pypi
     permissions:
@@ -60,3 +74,54 @@ jobs:
         uses: pypa/gh-action-pypi-publish@release/v1
         with:
           packages-dir: dist/
+
+  github-release:
+    name: GitHub release with assets
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write          # 创建 Release / 上传附件所需
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ env.RELEASE_TAG }}   # 取该 tag 的 CHANGELOG 作为 release notes
+      - uses: actions/download-artifact@v4
+        with:
+          name: dist
+          path: dist/
+      - name: create GitHub release and upload wheel + sdist
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAG: ${{ env.RELEASE_TAG }}
+        run: |
+          set -euo pipefail
+          NOTES="$(mktemp)"
+          {
+            echo "ZKTeco Live20R 指纹采集器 Python 库 — \`${TAG}\`"
+            echo
+            echo "纯 ctypes 封装 ZKFinger SDK, 零第三方依赖, 支持 Windows XP / Python 3.4+。"
+            echo
+            echo "安装: \`pip install pyzk20r\`"
+            echo
+            echo "### 本次变更"
+            echo
+          } > "${NOTES}"
+          # 取 CHANGELOG.md 里该 tag 对应的版本段落 (runner 自带 python3)
+          python3 -c "
+          import os, re, sys
+          tag = os.environ['TAG']
+          text = open('CHANGELOG.md', encoding='utf-8').read()
+          match = re.search(r'^## ' + re.escape(tag) + r'.*?\n(.*?)(?=^## |\Z)', text, re.M | re.S)
+          sys.stdout.write(match.group(1).strip() + '\n' if match else '')
+          " >> "${NOTES}"
+          if gh release view "${TAG}" >/dev/null 2>&1; then
+            echo "release ${TAG} already exists, uploading assets (clobber)"
+            gh release upload "${TAG}" dist/* --clobber
+          else
+            echo "creating release ${TAG}"
+            gh release create "${TAG}" \
+              --title "pyzk20r ${TAG}" \
+              --notes-file "${NOTES}" \
+              --latest \
+              dist/*
+          fi

@@ -410,6 +410,18 @@ python scripts/version.py tag v0.1.5      # 校验通过后打 tag
 CI 的 `version` job 与 `release` 工作流都会执行 `check`: 任何一处版本号对不上,
 流水线直接失败, 不会带着漂移的版本发布到 PyPI。
 
+### 发布渠道
+
+推 tag 会同时走两条渠道:
+
+- **PyPI**: `pip install pyzk20r` (Trusted Publishing 或 API token, 见 workflow 注释)
+- **GitHub Release**: 自动创建 Release 并附上 **wheel + sdist** 附件, Release
+  说明取自该 tag 对应的 CHANGELOG 段落
+
+需要给**已发布**的历史版本补附件时, 在 Actions 页手动触发
+`Release PyPI` 工作流 (workflow_dispatch), 填入 tag (如 `v0.1.5`) 即可 ——
+该模式只建/补 GitHub Release, 不会重复发 PyPI (同版本不可重传)。
+
 ## License
 
 MIT (见 LICENSE)。ZKFinger SDK 及 `libzkfp.dll` 版权归 ZKTeco 所有, 需随官方驱动获取, 仅供配合其设备使用。

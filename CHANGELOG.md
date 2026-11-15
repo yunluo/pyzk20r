@@ -3,6 +3,15 @@
 本库遵循 [语义化版本](https://semver.org/lang/zh-CN/) (0.x 阶段不保证 API 稳定)。
 发版流程与版本号约定见 README「发版流程」。
 
+## Unreleased
+
+### 新增
+
+- **GitHub Release 附件上传**: 推 tag 现在同时建 GitHub Release 并附上
+  wheel + sdist 附件, Release 说明自动取该 tag 对应的 CHANGELOG 段落。
+  新增 `workflow_dispatch` 手动触发模式: 填入 tag 即可给已发布的历史版本
+  补附件 (只动 GitHub Release, 不重复发 PyPI——同版本不可重传)
+
 ## v0.1.5 (2026-11-15)
 
 ### 修复
