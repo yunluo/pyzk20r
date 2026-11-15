@@ -85,6 +85,7 @@ jobs:
       - uses: actions/checkout@v4
         with:
           ref: ${{ env.RELEASE_TAG }}   # 取该 tag 的 CHANGELOG 作为 release notes
+          fetch-depth: 0                # gh release create 需要本地有 tag 引用
       - uses: actions/download-artifact@v4
         with:
           name: dist
@@ -122,6 +123,7 @@ jobs:
             gh release create "${TAG}" \
               --title "pyzk20r ${TAG}" \
               --notes-file "${NOTES}" \
+              --verify-tag \
               --latest \
               dist/*
           fi
