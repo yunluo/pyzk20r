@@ -5,6 +5,12 @@
 """
 from __future__ import absolute_import
 
+try:
+    from typing import Optional
+except ImportError:  # pragma: no cover -- Python 3.4 (typing 不在标准库)
+    raise ImportError(
+        "Python 3.4 需要 typing 后备包: pip install typing==3.7.4.3")
+
 __all__ = [
     "ZKFPMError", "DeviceError", "DeviceNotFoundError", "CaptureError",
     "MatchError", "MergeError", "ExtractError", "LibraryError", "raise_for",
@@ -14,7 +20,7 @@ __all__ = [
 class ZKFPMError(RuntimeError):
     """SDK 错误基类。``code`` 为原始 SDK 错误码 (0 成功, 其他见文档附录)。"""
 
-    def __init__(self, code: int, message: "str | None" = None) -> None:
+    def __init__(self, code: int, message: Optional[str] = None) -> None:
         self.code = int(code)
         super(ZKFPMError, self).__init__(message or ("SDK 错误码 %d" % self.code))
 
@@ -73,7 +79,7 @@ def error_class(code: int, fallback: type = ZKFPMError) -> type:
     return _ERROR_CLASS_BY_CODE.get(int(code), fallback)
 
 
-def raise_for(code: int, message: "str | None" = None, fallback: type = ZKFPMError) -> None:
+def raise_for(code: int, message: Optional[str] = None, fallback: type = ZKFPMError) -> None:
     """SDK 返回非 0 时抛出对应异常; 0 时无事发生。"""
     if code != 0:
         raise error_class(code, fallback)(int(code), message)

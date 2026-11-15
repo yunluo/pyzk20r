@@ -4,8 +4,8 @@
 低层封装: DLL 加载/定位、函数原型声明、错误码与参数代码枚举、
 全局初始化引用计数。上层 (device/db) 只通过本模块访问 SDK。
 
-语法兼容 Python 3.4 (Windows XP): 禁用 f-string / 变量标注语法 / typing 导入;
-参数/返回类型用内联标注 (PEP 3107), typing 构造以字符串形式标注, 变量用注释。
+语法兼容 Python 3.4 (Windows XP): 禁用 f-string / 变量标注语法;
+类型标注用内联标注 (PEP 3107) + typing 构造 (Python 3.4 需装 typing 后备包)。
 """
 from __future__ import absolute_import
 
@@ -14,6 +14,12 @@ import enum
 import os
 
 from .exceptions import ZKFPMError
+
+try:
+    from typing import Optional
+except ImportError:  # pragma: no cover -- Python 3.4 (typing 不在标准库)
+    raise ImportError(
+        "Python 3.4 需要 typing 后备包: pip install typing==3.7.4.3")
 
 __all__ = [
     "ZKFPErr", "Param", "DBParam", "MAX_TEMPLATE_SIZE",
@@ -93,7 +99,7 @@ class DBParam(enum.IntEnum):
 # DLL 加载
 # ---------------------------------------------------------------------------
 
-def resolve_dll_path(explicit: "str | None" = None) -> str:
+def resolve_dll_path(explicit: Optional[str] = None) -> str:
     """按 显式指定 -> 环境变量 -> 系统 的顺序定位 DLL。
 
     依赖系统副本: libzkfp.dll 的内部依赖 (ZKFPCap.dll -> fppswsk12.dll ->
@@ -114,7 +120,7 @@ def resolve_dll_path(explicit: "str | None" = None) -> str:
     return _DLL_NAME                             # 兜底: 交给系统搜索 (SysWOW64/PATH)
 
 
-def load_dll(path: "str | None" = None) -> ctypes.WinDLL:
+def load_dll(path: Optional[str] = None) -> ctypes.WinDLL:
     """加载 libzkfp.dll 并声明全部函数原型 (stdcall)。"""
     dll = ctypes.WinDLL(resolve_dll_path(path))
     _set_prototypes(dll)
@@ -122,10 +128,10 @@ def load_dll(path: "str | None" = None) -> ctypes.WinDLL:
 
 
 #: 惰性加载的 DLL 单例; 测试可注入伪造对象
-dll = None                                     # type: ctypes.WinDLL | None
+dll = None                                     # type: Optional[ctypes.WinDLL]
 
 
-def get_dll(path: "str | None" = None) -> ctypes.WinDLL:
+def get_dll(path: Optional[str] = None) -> ctypes.WinDLL:
     """返回已加载的 DLL, 必要时加载。
 
     首次加载后全局缓存, 再次调用时 ``path`` 被忽略 (先加载者优先);
@@ -190,7 +196,7 @@ def _set_prototypes(dll: ctypes.WinDLL) -> None:
 _init_refs = 0
 
 
-def lib_addref(path: "str | None" = None) -> ctypes.WinDLL:
+def lib_addref(path: Optional[str] = None) -> ctypes.WinDLL:
     """确保 SDK 已初始化并递增引用计数, 返回 DLL。"""
     global _init_refs
     d = get_dll(path)

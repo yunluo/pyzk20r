@@ -64,28 +64,28 @@ def test_sources_parse_as_py34():
         ast.parse(source, filename=path, feature_version=(3, 4))
 
 
-def test_sources_have_no_fstring_and_no_typing_import():
-    """双保险: 禁 f-string; 禁任何形式的 typing 导入 (含 ``if False:`` 死分支)。
-
-    复杂类型一律用字符串形式标注 (``"list[bytes]"`` / ``"str | None"``),
-    由类型检查器解析, 运行时与 3.4 均无 typing 依赖。
-    """
+def test_sources_have_no_fstring():
+    """禁 f-string (3.4 不支持)。"""
     for path, source in _package_sources():
         tree = ast.parse(source)
         for node in ast.walk(tree):
             assert not isinstance(node, ast.JoinedStr), "f-string 禁用于 3.4: %s" % path
-            if isinstance(node, ast.Import):
-                for alias in node.names:
-                    assert alias.name != "typing", "禁止导入 typing: %s" % path
-            elif isinstance(node, ast.ImportFrom):
-                mod = node.module or ""
-                assert mod != "typing", "禁止导入 typing: %s" % path
+
+
+def test_typing_import_guarded_for_py34():
+    """typing 导入必须用 try/except 包裹, 并在缺失时给出 3.4 后备包提示。"""
+    for path, source in _package_sources():
+        if "from typing import" not in source:
+            continue
+        assert "except ImportError" in source, "%s 的 typing 导入未做 3.4 兼容处理" % path
+        assert "typing==3.7.4.3" in source, "%s 缺少 typing 后备包安装提示" % path
 
 
 def test_sources_use_inline_annotations():
-    """公共 API 使用内联参数/返回标注; 禁止旧式全签名注释 ``# type: (...)``。
+    """公共 API 使用内联参数/返回标注 + typing 构造。
 
-    变量类型注释 (如 ``x = None  # type: int | None``) 仍允许 —— 3.4 无变量标注语法。
+    禁止: 旧式全签名注释 ``# type: (...)`` 与带引号的字符串标注
+    (AST 判定: 标注节点不得是字符串常量)。
     """
     core = ["device.py", "db.py", "exceptions.py", "_binding.py"]
     for name in core:
@@ -95,6 +95,18 @@ def test_sources_use_inline_annotations():
             src = f.read().decode("utf-8")
         assert "# type: (" not in src, "%s 仍存在旧式签名注释标注" % name
         assert "-> " in src, "%s 缺少内联返回类型标注" % name
+        tree = ast.parse(src)
+        for node in ast.walk(tree):
+            if not isinstance(node, ast.FunctionDef):
+                continue
+            annotations = [node.returns]
+            for arg in list(node.args.args) + list(node.args.kwonlyargs):
+                annotations.append(arg.annotation)
+            for ann in annotations:
+                if ann is None:
+                    continue
+                assert not (isinstance(ann, ast.Constant) and isinstance(ann.value, str)), (
+                    "%s 存在带引号的字符串标注: %s" % (name, ast.dump(ann)))
 
 
 @pytest.mark.parametrize("name", ["Scanner", "FingerprintDB", "Frame", "ZKFPMError"])
