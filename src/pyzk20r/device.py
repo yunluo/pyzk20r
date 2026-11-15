@@ -283,10 +283,16 @@ class Scanner:
         raise_for(ret, "failed to acquire fingerprint image")
         return buf.raw
 
-    def _try_acquire(self) -> Optional[Frame]:
-        """尝试采集一次; 瞬态失败 (暂无手指等) 返回 None, 其他错误抛异常。"""
+    def _try_acquire(self, params: Optional[Tuple[int, int, int]] = None) -> Optional[Frame]:
+        """尝试采集一次; 瞬态失败 (暂无手指等) 返回 None, 其他错误抛异常。
+
+        ``params`` 为 (width, height, dpi), 采集循环内传入可避免每轮重复查询;
+        ``None`` 表示内部自行获取。子类覆写时请保留该可选参数。
+        """
         handle = self._require_open()
-        width, height, dpi = self.capture_params()
+        if params is None:
+            params = self.capture_params()
+        width, height, dpi = params
         img_buf = ctypes.create_string_buffer(width * height)
         tpl_buf = ctypes.create_string_buffer(MAX_TEMPLATE_SIZE)
         tpl_len = ctypes.c_uint(MAX_TEMPLATE_SIZE)
@@ -305,10 +311,13 @@ class Scanner:
         反复轮询直到取像成功 (语义与文档一致: 需有手指才返回)。
         ``timeout`` 为最长等待秒数, 超时抛 :class:`CaptureError`;
         ``None`` 表示一直等到有手指 (Ctrl+C 可中断)。
+        采集参数 (宽高/DPI) 在进入循环时读取一次并复用; 运行中改动
+        参数请退出后重新调用。
         """
+        params = self.capture_params()
         deadline = None if timeout is None else time.monotonic() + timeout
         while True:
-            frame = self._try_acquire()
+            frame = self._try_acquire(params)
             if frame is not None:
                 return frame
             if deadline is not None and time.monotonic() >= deadline:
@@ -320,10 +329,12 @@ class Scanner:
         """持续采集生成器: 反复尝试, 成功则 yield Frame, 失败休眠重试。
 
         ``poll_interval`` 为失败重试间隔秒数 (0 为连续轮询)。
+        采集参数在生成器首次迭代时读取一次并复用。
         break 退出即可, 设备仍需 :meth:`close` 或 with 块结束才关闭。
         """
+        params = self.capture_params()
         while True:
-            frame = self._try_acquire()
+            frame = self._try_acquire(params)
             if frame is not None:
                 yield frame
             elif poll_interval > 0:
@@ -338,10 +349,11 @@ class Scanner:
         自助终端等无人值守场景务必传 timeout, 防止用户中途离开导致无限阻塞。
         """
         total = 3
+        params = self.capture_params()
         deadline = None if timeout is None else time.monotonic() + timeout
         templates = []  # type: List[bytes]
         while len(templates) < total:
-            frame = self._try_acquire()
+            frame = self._try_acquire(params)
             if frame is not None:
                 templates.append(frame.template)
                 self.on_enroll_progress(len(templates), total)

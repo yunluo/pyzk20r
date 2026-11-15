@@ -33,7 +33,6 @@ classifiers = [
     "Programming Language :: Python :: 3.10",
     "Programming Language :: Python :: 3.11",
     "Programming Language :: Python :: 3.12",
-    "Programming Language :: Python :: 3.13",
     "Topic :: Security",
     "Topic :: Software Development :: Libraries :: Python Modules",
 ]
@@ -44,7 +43,7 @@ Homepage = "https://github.com/yunluo/pyzk20r"
 [tool.uv.build-backend]
 module-name = "pyzk20r"
 module-root = "src"                           # src 布局: 模块在 src/ 下
-source-include = ["tests/**", "examples/**"]  # sdist 附带测试与示例
+source-include = ["tests/**", "examples/**", "CHANGELOG.md"]  # sdist 附带测试/示例/变更日志
 source-exclude = ["**/*.db"]                 # 排除指纹数据文件
 
 [tool.ruff]
