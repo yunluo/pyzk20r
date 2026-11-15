@@ -59,7 +59,7 @@ with Scanner() as dev:
 
 | 成员 | 说明 |
 | --- | --- |
-| `acquire()` | 阻塞采集一帧 → `Frame` (无手指抛 `CaptureError`) |
+| `acquire(poll_interval=0.1, timeout=None)` | **阻塞等待手指**并采集一帧 → `Frame`; `timeout` 秒超时抛 `CaptureError` (`None` 为一直等) |
 | `capture(poll_interval=0.1)` | 持续采集生成器, 逐帧 `yield Frame` (设备关闭后下一次迭代抛 `ZKFPMError`) |
 | `acquire_image()` | 只取图像字节 |
 | `enroll(poll_interval)` | 连续采集 3 次 (SDK 合并固定要求) 返回模板列表, 每次回调 `on_enroll_progress(done, total)` |

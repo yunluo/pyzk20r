@@ -289,12 +289,22 @@ class Scanner:
             return None
         raise error_class(int(ret))(int(ret), "采集失败")
 
-    def acquire(self) -> Frame:
-        """阻塞采集一次 (需有手指), 失败抛 :class:`CaptureError`。"""
-        frame = self._try_acquire()
-        if frame is None:
-            raise CaptureError(int(ZKFPErr.CAPTURE), "取像失败")
-        return frame
+    def acquire(self, poll_interval: float = 0.1, timeout: "float | None" = None) -> Frame:
+        """阻塞等待手指并采集一次。
+
+        反复轮询直到取像成功 (语义与文档一致: 需有手指才返回)。
+        ``timeout`` 为最长等待秒数, 超时抛 :class:`CaptureError`;
+        ``None`` 表示一直等到有手指 (Ctrl+C 可中断)。
+        """
+        deadline = None if timeout is None else time.monotonic() + timeout
+        while True:
+            frame = self._try_acquire()
+            if frame is not None:
+                return frame
+            if deadline is not None and time.monotonic() >= deadline:
+                raise CaptureError(int(ZKFPErr.CAPTURE), "取像超时 (%s 秒)" % timeout)
+            if poll_interval > 0:
+                time.sleep(poll_interval)
 
     def capture(self, poll_interval: float = 0.1) -> "collections.abc.Iterator[Frame]":
         """持续采集生成器: 反复尝试, 成功则 yield Frame, 失败休眠重试。

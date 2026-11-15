@@ -111,10 +111,19 @@ def test_acquire_returns_frame(fake_dll):
 
 
 def test_acquire_raises_on_persistent_fail(fake_dll):
+    """超时后抛 CaptureError (timeout=0 即立即超时)。"""
     fake_dll.acquire_queue = [-8, -8, -8]
     with Scanner() as dev:
         with pytest.raises(CaptureError):
-            dev.acquire()
+            dev.acquire(poll_interval=0, timeout=0)
+
+
+def test_acquire_waits_for_finger(fake_dll):
+    """阻塞等待语义: 前两次失败 (暂无手指), 第三次成功。"""
+    fake_dll.acquire_queue = [-8, -8, 0]
+    with Scanner() as dev:
+        frame = dev.acquire(poll_interval=0)
+    assert frame.template == TEMPLATE
 
 
 def test_capture_generator_retries_transient(fake_dll):
