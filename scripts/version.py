@@ -58,7 +58,8 @@ class VersionError(Exception):
 def read_text(path):
     """读取文本文件, 返回 (内容, 换行符)。"""
     try:
-        raw = path.read_bytes()
+        with open(str(path), "rb") as f:  # open 而非 Path.read_bytes: 兼容 3.4 的 pathlib
+            raw = f.read()
     except OSError as exc:
         raise VersionError("读取 {} 失败: {}".format(path, exc))
     text = raw.decode("utf-8")
@@ -69,7 +70,8 @@ def write_text(path, text, newline):
     """写回文本文件, 统一使用指定换行符。"""
     if newline == "\r\n":
         text = text.replace("\r\n", "\n").replace("\n", "\r\n")
-    path.write_bytes(text.encode("utf-8"))
+    with open(str(path), "wb") as f:
+        f.write(text.encode("utf-8"))
 
 
 def section_span(text, name):

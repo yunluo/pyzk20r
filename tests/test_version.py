@@ -1,13 +1,18 @@
 # -*- coding: utf-8 -*-
-"""版本号一致性测试: pyproject.toml / __init__.py / uv.lock / git tag 四处不得漂移。"""
+"""版本号一致性测试: pyproject.toml / __init__.py / uv.lock / git tag 四处不得漂移。
 
-import importlib.util
+本文件保持 Python 3.4 兼容 (子进程用 check_output, 脚本加载用 SourceFileLoader),
+让 3.4 真机也能跑全套测试。
+"""
+
+import importlib.machinery
 import os
 import shutil
 import stat
 import subprocess
 import sys
 import tempfile
+import types
 import unittest
 
 REPO_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -15,10 +20,11 @@ SCRIPT = os.path.join(REPO_DIR, "scripts", "version.py")
 
 
 def _load_tool():
-    """按文件路径加载 scripts/version.py (避免污染 sys.path)。"""
-    spec = importlib.util.spec_from_file_location("version_tool", SCRIPT)
-    module = importlib.util.module_from_spec(spec)
-    spec.loader.exec_module(module)
+    """按文件路径加载 scripts/version.py (避免污染 sys.path; 3.4 无 spec_from_file_location)。"""
+    loader = importlib.machinery.SourceFileLoader("version_tool", SCRIPT)
+    module = types.ModuleType(loader.name)
+    module.__file__ = SCRIPT
+    loader.exec_module(module)
     return module
 
 
@@ -35,13 +41,20 @@ def _rmtree_readonly(path):
     shutil.rmtree(path, onerror=onerror)
 
 
+def _output(args, cwd=None, env=None):
+    """跑命令并捕获 stdout+stderr, 返回 (返回码, 输出文本)。"""
+    try:
+        out = subprocess.check_output(args, cwd=cwd, env=env, stderr=subprocess.STDOUT)
+        return 0, out.decode("utf-8", "replace")
+    except subprocess.CalledProcessError as e:
+        return e.returncode, (e.output or b"").decode("utf-8", "replace")
+
+
 def _git(repo, *args):
-    subprocess.run(
+    subprocess.check_output(
         ["git", "-c", "user.email=t@example.com", "-c", "user.name=test"] + list(args),
         cwd=repo,
-        stdout=subprocess.PIPE,
-        stderr=subprocess.PIPE,
-        check=True,
+        stderr=subprocess.STDOUT,
     )
 
 
@@ -64,26 +77,18 @@ def _write_sources(root, version):
 def _run_check(root):
     """在指定根目录跑 check, 返回 (退出码, 输出)。"""
     env = dict(os.environ, PYZK20R_ROOT=os.path.abspath(root))
-    proc = subprocess.run(
-        [sys.executable, SCRIPT, "check"],
-        cwd=root,
-        env=env,
-        stdout=subprocess.PIPE,
-        stderr=subprocess.STDOUT,
-    )
-    return proc.returncode, proc.stdout.decode("utf-8", "replace")
+    return _output([sys.executable, SCRIPT, "check"], cwd=root, env=env)
 
 
 def _run_tool(root, *args):
-    """在指定根目录跑 version.py 子命令, 返回 CompletedProcess。"""
+    """在指定根目录跑 version.py 子命令, 返回 (返回码, 输出)。"""
     env = dict(os.environ, PYZK20R_ROOT=os.path.abspath(root))
-    return subprocess.run(
-        [sys.executable, SCRIPT] + list(args),
-        cwd=root,
-        env=env,
-        stdout=subprocess.PIPE,
-        stderr=subprocess.STDOUT,
-    )
+    return _output([sys.executable, SCRIPT] + list(args), cwd=root, env=env)
+
+
+# version.py 自身要求 3.7+ (subprocess.run / sys.stdout.reconfigure);
+# 在更老的解释器 (3.4) 上只跑文件级一致性, 跳过子进程层
+_HAS_SUBPROCESS_RUN = hasattr(subprocess, "run")
 
 
 class TestRepoVersionConsistency(unittest.TestCase):
@@ -96,19 +101,15 @@ class TestRepoVersionConsistency(unittest.TestCase):
         if version_tool.UV_LOCK.exists():
             self.assertEqual(version_tool.read_lock_version(), pyproject_version)
 
+    @unittest.skipUnless(_HAS_SUBPROCESS_RUN, "version.py 需要 subprocess.run (3.5+)")
     def test_check_command_passes(self):
         """check 子命令在本仓库必须通过 (CI 的 version job 跑的就是这条)。"""
-        proc = subprocess.run(
-            [sys.executable, SCRIPT, "check"],
-            cwd=REPO_DIR,
-            stdout=subprocess.PIPE,
-            stderr=subprocess.STDOUT,
-        )
-        output = proc.stdout.decode("utf-8", "replace")
-        self.assertEqual(proc.returncode, 0, output)
+        code, out = _output([sys.executable, SCRIPT, "check"], cwd=REPO_DIR)
+        self.assertEqual(code, 0, out)
 
 
 @unittest.skipUnless(shutil.which("git"), "需要 git 才能测试 tag 漂移检测")
+@unittest.skipUnless(_HAS_SUBPROCESS_RUN, "version.py 需要 subprocess.run (3.5+)")
 class TestDriftDetection(unittest.TestCase):
     """在临时 git 仓库里构造漂移, 验证 check/bump 真的能拦下。"""
 
@@ -167,9 +168,8 @@ class TestDriftDetection(unittest.TestCase):
 
     def test_bump_syncs_all_sources(self):
         """bump 要同时改 pyproject / __init__ / uv.lock 三处。"""
-        proc = _run_tool(self.root, "bump", "0.9.1")
-        output = proc.stdout.decode("utf-8", "replace")
-        self.assertEqual(proc.returncode, 0, output)
+        code, out = _run_tool(self.root, "bump", "0.9.1")
+        self.assertEqual(code, 0, out)
         with open(os.path.join(self.root, "pyproject.toml"), encoding="utf-8") as f:
             self.assertIn('version = "0.9.1"', f.read())
         with open(os.path.join(self.root, "src", "pyzk20r", "__init__.py"), encoding="utf-8") as f:
@@ -178,10 +178,9 @@ class TestDriftDetection(unittest.TestCase):
             self.assertIn('version = "0.9.1"', f.read())
 
     def test_bump_refuses_downgrade(self):
-        proc = _run_tool(self.root, "bump", "0.8.0")
-        output = proc.stdout.decode("utf-8", "replace")
-        self.assertEqual(proc.returncode, 1)
-        self.assertIn("不允许降级", output)
+        code, out = _run_tool(self.root, "bump", "0.8.0")
+        self.assertEqual(code, 1)
+        self.assertIn("不允许降级", out)
 
 
 if __name__ == "__main__":

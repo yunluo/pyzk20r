@@ -14,6 +14,17 @@ from pyzk20r import FingerprintDB, Scanner
 REPO_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 PKG_DIR = os.path.join(REPO_DIR, "src", "pyzk20r")
 
+if hasattr(ast, "Constant"):  # Python 3.6+
+    _CONSTANT_TYPES = (ast.Constant,)
+
+    def _const_value(node):
+        return getattr(node, "value", None)
+else:  # Python 3.4/3.5: 旧节点类型 (3.12 起已移除, 不影响现代版本)
+    _CONSTANT_TYPES = (ast.Str, ast.Num)
+
+    def _const_value(node):
+        return getattr(node, "s", getattr(node, "n", None))
+
 
 # ---------------------------------------------------------------------------
 # 全链路整合
@@ -89,11 +100,7 @@ class TestSyntaxGuards(unittest.TestCase):
             for node in ast.walk(tree):
                 if not (isinstance(node, ast.BinOp) and isinstance(node.op, ast.Mod)):
                     continue
-                left = node.left
-                if isinstance(left, ast.Constant):
-                    value = left.value
-                else:
-                    value = getattr(left, "s", None)  # Python 3.7: ast.Str
+                value = _const_value(node.left) if isinstance(node.left, _CONSTANT_TYPES) else None
                 self.assertFalse(
                     isinstance(value, str),
                     "{} 仍使用 % 格式化, 请改用 .format(): {}".format(path, value),
@@ -143,7 +150,7 @@ class TestSyntaxGuards(unittest.TestCase):
                     if ann is None:
                         continue
                     self.assertFalse(
-                        isinstance(ann, ast.Constant) and isinstance(ann.value, str),
+                        isinstance(ann, _CONSTANT_TYPES) and isinstance(_const_value(ann), str),
                         "{} 存在带引号的字符串标注: {}".format(name, ast.dump(ann)),
                     )
 
