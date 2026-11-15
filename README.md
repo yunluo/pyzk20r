@@ -241,7 +241,17 @@ uv run ruff check .               # lint
 uv run mypy                       # 类型检查 (PEP 484 标注)
 ```
 
-dev 工具由 `[dependency-groups]` 提供 (pytest / ruff / mypy), `uv run` 自动同步。
+dev 工具由 `[dependency-groups]` 提供 (pytest), `uv run` 自动同步; ruff/mypy 用
+`uvx` 隔离运行 (不受项目 Python 版本约束影响)。
+
+仓库采用 **src 布局** (`src/pyzk20r/`), 包源码不在仓库根目录, 避免与测试/示例混在一起:
+
+```
+src/pyzk20r/      库源码
+tests/             单元测试 (FakeDLL 注入) + 真机冒烟
+examples/          可运行示例
+doc/               厂商 SDK 文档 (不入库)
+```
 
 打包使用 uv 自家后端 (`uv_build`), 无需额外装 hatchling:
 

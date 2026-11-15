@@ -9,7 +9,8 @@ from conftest import MERGED, TEMPLATE
 
 from pyzk20r import FingerprintDB, Scanner
 
-PKG_DIR = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "pyzk20r")
+REPO_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+PKG_DIR = os.path.join(REPO_DIR, "src", "pyzk20r")
 
 
 # ---------------------------------------------------------------------------
@@ -121,7 +122,7 @@ def test_version_consistent_with_pyproject():
     import re
 
     import pyzk20r
-    pyproject = os.path.join(os.path.dirname(PKG_DIR), "pyproject.toml")
+    pyproject = os.path.join(REPO_DIR, "pyproject.toml")
     with open(pyproject, "rb") as f:
         text = f.read().decode("utf-8")
     match = re.search(r'(?m)^version = "(.+)"', text)

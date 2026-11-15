@@ -15,12 +15,11 @@ jobs:
       - uses: astral-sh/setup-uv@v5
         with:
           python-version: "3.12"
-      - name: 同步依赖 (含 dev 组)
-        run: uv sync
+      # lint 工具用 uvx 隔离运行, 不受项目 requires-python 约束影响
       - name: ruff lint
-        run: uv run ruff check .
+        run: uvx ruff check .
       - name: mypy 类型检查
-        run: uv run mypy
+        run: uvx --from "mypy>=1.10" mypy src/pyzk20r
       - name: 构建产物校验
         run: uv build
 
@@ -40,4 +39,4 @@ jobs:
       - name: 同步依赖 (含 dev 组)
         run: uv sync
       - name: 测试 (mock 全量 + 真机冒烟自动跳过)
-        run: uv run pytest -q
+        run: uv run python -m pytest -q

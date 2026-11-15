@@ -43,6 +43,8 @@ MERGE_COUNT = 3
 _DUMP_VERSION = 2
 _DUMP_VERSIONS = (1, 2)
 
+#: 字符串路径编码 (Windows ANSI, 兼容 XP)
+_PATH_ENCODING = "mbcs"
 
 def _norm_user_id(user_id: Union[str, int]) -> str:
     """工号归一化: 接受 str 或 int (bool 拒绝), 去首尾空白, 统一为 str。
@@ -56,8 +58,7 @@ def _norm_user_id(user_id: Union[str, int]) -> str:
         raise ValueError("user_id 不能为空")
     return text
 
-#: 字符串路径编码 (Windows ANSI, 兼容 XP)
-_PATH_ENCODING = "mbcs"
+
 
 
 class FingerprintDB:

@@ -7,7 +7,7 @@ name = "pyzk20r"
 version = "0.1.1"
 description = "ZKTeco Live20R 指纹采集器 Python 库 (ZKFinger SDK C API, 纯 ctypes, 零依赖, 支持 Windows XP / Python 3.4+)"
 readme = "README.md"
-requires-python = ">=3.4"
+requires-python = "==3.7.9"
 license = "MIT"
 license-files = ["LICENSE"]
 authors = [{ name = "yunluo" }]
@@ -31,15 +31,13 @@ Homepage = "https://www.zksps.com/productinfo/46887.html"
 
 [tool.uv.build-backend]
 module-name = "pyzk20r"
-module-root = ""                             # 扁平布局: 模块在仓库根 (非 src/)
+module-root = "src"                           # src 布局: 模块在 src/ 下
 source-include = ["tests/**", "examples/**"]  # sdist 附带测试与示例
 source-exclude = ["**/*.db"]                 # 排除指纹数据文件
 
 [dependency-groups]
 dev = [
     "pytest",
-    "ruff",
-    "mypy",
 ]
 
 [tool.pytest.ini_options]
@@ -56,4 +54,4 @@ target-version = "py37"
 select = ["E", "F", "W", "I", "UP004"]
 
 [tool.mypy]
-files = ["pyzk20r"]
+files = ["src/pyzk20r"]
