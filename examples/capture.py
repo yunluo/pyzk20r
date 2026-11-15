@@ -14,19 +14,11 @@ def main():
     with Scanner() as dev:
         info = dev.info()
         print("设备: {} {} 序列号={}".format(info.vendor, info.product, info.serial))
-        print(
-            "等待手指... (图像 {:d}x{:d} @{:d} DPI, 防假={})".format(
-                dev.width, dev.height, dev.dpi, dev.fake_detect
-            )
-        )
+        print("等待手指... (图像 {:d}x{:d} @{:d} DPI, 防假={})".format(dev.width, dev.height, dev.dpi, dev.fake_detect))
         for frame in dev.capture(poll_interval=0.1):
             with open(out, "wb") as f:
                 f.write(frame.to_bmp())
-            print(
-                "已保存 {} (图像 {:d} 字节, 模板 {:d} 字节)".format(
-                    out, len(frame.image), len(frame.template)
-                )
-            )
+            print("已保存 {} (图像 {:d} 字节, 模板 {:d} 字节)".format(out, len(frame.image), len(frame.template)))
             break
 
 

@@ -67,11 +67,7 @@ def main():
             for frame in dev.capture(poll_interval=0.1):
                 try:
                     uid, score = db.identify(frame.template)
-                    print(
-                        "识别成功: 用户 {:d}, 分数 {:d} (阈值 {:d})".format(
-                            uid, score, db.threshold_1_n
-                        )
-                    )
+                    print("识别成功: 用户 {:d}, 分数 {:d} (阈值 {:d})".format(uid, score, db.threshold_1_n))
                 except MatchError:
                     print("未识别")
     except KeyboardInterrupt:

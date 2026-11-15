@@ -38,10 +38,7 @@ def check_password(worker_id, password):
 
 def open_store():
     conn = sqlite3.connect(DB_FILE)
-    conn.execute(
-        "CREATE TABLE IF NOT EXISTS workers ("
-        "worker_id TEXT PRIMARY KEY, password TEXT NOT NULL DEFAULT '')"
-    )
+    conn.execute("CREATE TABLE IF NOT EXISTS workers (worker_id TEXT PRIMARY KEY, password TEXT NOT NULL DEFAULT '')")
     conn.execute(
         "CREATE TABLE IF NOT EXISTS fingerprints ("
         "worker_id TEXT NOT NULL, seq INTEGER NOT NULL, tpl BLOB NOT NULL,"
@@ -53,9 +50,7 @@ def open_store():
 def load_db(conn):
     """启动时从 SQLite 重建内存指纹库 (识别用)。"""
     db = FingerprintDB()
-    for worker_id, tpl in conn.execute(
-        "SELECT worker_id, tpl FROM fingerprints ORDER BY worker_id, seq"
-    ):
+    for worker_id, tpl in conn.execute("SELECT worker_id, tpl FROM fingerprints ORDER BY worker_id, seq"):
         db.add(worker_id, tpl)
     return db
 
@@ -144,11 +139,7 @@ def main():
     dev = None
     try:
         dev = Scanner()  # 设备缺失则只保留密码登录
-        print(
-            "设备就绪: {} (已登记 {:d} 枚指纹, 用户 {})".format(
-                dev.info().vid_pid, db.count, db.users
-            )
-        )
+        print("设备就绪: {} (已登记 {:d} 枚指纹, 用户 {})".format(dev.info().vid_pid, db.count, db.users))
     except ZKFPMError as e:
         print("!! 指纹设备不可用 ({}), 仅保留工号+密码登录".format(e))
 

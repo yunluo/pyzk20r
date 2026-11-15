@@ -13,7 +13,7 @@ license-files = ["LICENSE"]
 authors = [{ name = "yunluo" }]
 keywords = ["zkteco", "fingerprint", "live20r", "biometrics", "libzkfp"]
 # Python 3.4 无内置 typing 模块, 用官方 typing 移植包补齐 (现代版本不受影响)
-dependencies = ['typing; python_version < "3.5"']
+dependencies = ['typing==3.10.0.0; python_version < "3.5"']
 classifiers = [
     "Development Status :: 4 - Beta",
     "Intended Audience :: Developers",
@@ -48,7 +48,7 @@ source-include = ["tests/**", "examples/**"]  # sdist 附带测试与示例
 source-exclude = ["**/*.db"]                 # 排除指纹数据文件
 
 [tool.ruff]
-line-length = 100
+line-length = 120
 target-version = "py37"
 
 [tool.ruff.lint]
