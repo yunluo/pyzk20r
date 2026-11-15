@@ -61,7 +61,8 @@ jobs:
       # 凭据二选一:
       #   1) 仓库 Secrets 配置 PYPI_API_TOKEN (pypi.org 的 API token, 需勾选 pyzk20r 项目)
       #   2) 或用 Trusted Publishing: pypi.org 项目页配置 publisher
-      #      owner=yunluo repo=pyzk_20r workflow=release.yml environment=pypi
+      #      owner=yunluo repo=pyzk20r workflow=release.yml environment=pypi
+      #      (仓库名没有下划线, 填错会报 "no publisher found")
       - name: 发布 PyPI (API Token)
         if: env.PYPI_API_TOKEN != ''
         uses: pypa/gh-action-pypi-publish@release/v1
