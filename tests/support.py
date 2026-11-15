@@ -29,6 +29,7 @@ class FakeDLL:
         self.acquire_queue = []  # 0/元组=成功, 负数=错误码
         self.acquire_fail = None  # 非 None 时持续返回该错误码 (脚本化"始终无手指/故障")
         self.set_params = {}  # code -> bytes
+        self.set_param_ret = 0  # ZKFPM_SetParameters 返回码 (可设为 -5 模拟不支持)
         self.db_adds = {}  # fid -> bytes
         self.db_params = {1: 50, 2: 70}  # 阈值 (SDK 文档默认 50 / 70)
         self.db_ident_result = (1, 99)  # (fid, score)
@@ -92,7 +93,7 @@ class FakeDLL:
 
     def ZKFPM_SetParameters(self, handle, code, buf, cb):
         self.set_params[int(code)] = buf.raw[:cb]
-        return 0
+        return self.set_param_ret
 
     def ZKFPM_GetCaptureParamsEx(self, handle, pw, ph, pd):
         for ptr, value in ((pw, WIDTH), (ph, HEIGHT), (pd, DPI)):

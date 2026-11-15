@@ -31,9 +31,16 @@
 
 ### 新增
 
+- `Scanner.beep(on=True)`: 蜂鸣器控制 (参数码 104, 只写)。SDK 文档标注该
+  参数 "not supported by the LIVE20R", 实测 Live20R 写入返回 -5 (固件不认
+  该参数)——此类机型调用会抛 `DeviceError` 并附明确说明, 不再是难以理解
+  的原始错误码
 - `CaptureTimeoutError` (`CaptureError` 子类): `acquire` / `enroll` 超时改抛该
   类型, 无人值守场景可按异常类型区分 "用户未按手指" 与 "取像故障";
   已有 `except CaptureError` 分支不受影响
+- 诊断脚本 `scripts/diag_led.py` / `scripts/diag_params.py` /
+  `scripts/diag_beep.py` / `scripts/diag_exports.py` / `scripts/diag_restore.py`:
+  换机型/固件时逐项核对灯效、蜂鸣、参数码与导出表
 
 ### 变更
 

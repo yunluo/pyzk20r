@@ -256,6 +256,24 @@ class Scanner:
             raise ValueError("color only supports 'white' / 'green' / 'red'")
         self.set_param_int(code, 1 if on else 0)
 
+    def beep(self, on: bool = True) -> None:
+        """控制蜂鸣器 (参数码 104, 只写)。
+
+        SDK 文档标注该参数 "not supported by the LIVE20R": 支持的机型上
+        写 1 蜂鸣、0 停止; 不支持的机型固件直接返回 -5 (无效参数),
+        此时抛 :class:`DeviceError` 并给出明确提示。
+        """
+        try:
+            self.set_param_int(Param.BEEP, 1 if on else 0)
+        except DeviceError as e:
+            if e.code == int(ZKFPErr.INVALID_PARAM):
+                raise DeviceError(
+                    e.code,
+                    "beep is not supported by this device or firmware "
+                    "(parameter 104 rejected: SDK documents it as unsupported on LIVE20R)",
+                )
+            raise
+
     def info(self) -> DeviceInfo:
         raw = self.get_param_bytes(Param.VID_PID, 4)
         if len(raw) < 4:  # 部分固件不回填, 防御 struct.error

@@ -10,7 +10,7 @@ from support import DPI, HEIGHT, IMAGE, TEMPLATE, WIDTH, FakeDLLTestCase
 
 from pyzk20r import Scanner, ZKFPErr, ZKFPMError, _binding
 from pyzk20r.device import Frame
-from pyzk20r.exceptions import CaptureError, CaptureTimeoutError, DeviceNotFoundError
+from pyzk20r.exceptions import CaptureError, CaptureTimeoutError, DeviceError, DeviceNotFoundError
 
 
 class RecordingScanner(Scanner):
@@ -87,6 +87,22 @@ class TestDevice(FakeDLLTestCase):
                 dev.led("blue")
         self.assertEqual(struct.unpack("<i", self.fake_dll.set_params[102]), (1,))
         self.assertEqual(struct.unpack("<i", self.fake_dll.set_params[103]), (0,))
+
+    def test_beep(self):
+        """蜂鸣参数码 104 (只写); 不支持的机型写入返回 -5 -> 明确报错。"""
+        with Scanner() as dev:
+            dev.beep(True)
+            dev.beep(False)
+        self.assertEqual(struct.unpack("<i", self.fake_dll.set_params[104]), (0,))
+
+    def test_beep_unsupported_device(self):
+        """固件拒绝蜂鸣参数 (-5) 时, 抛 DeviceError 且消息明确。"""
+        self.fake_dll.set_param_ret = -5
+        with Scanner() as dev:
+            with self.assertRaises(DeviceError) as cm:
+                dev.beep(True)
+        self.assertEqual(cm.exception.code, -5)
+        self.assertIn("not supported", str(cm.exception))
 
     def test_info(self):
         with Scanner() as dev:

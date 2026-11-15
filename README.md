@@ -68,6 +68,7 @@ with Scanner() as dev:
 | `finger_is_live` | 最近一次采集是否真手指 (`value & 31 == 31`) |
 | `info()` | `DeviceInfo(vendor, product, serial, vid_pid)` |
 | `led('white'/'green'/'red', on)` | 指示灯 (参数码 101/102/103, **只写**; 实测 Live20R 三色可用; 读取这些只写参数会返回 -5, 属正常现象) |
+| `beep(on)` | 蜂鸣器 (参数码 104, **只写**; SDK 文档标注 LIVE20R **不支持**, 该机型调用抛 `DeviceError` 并给出明确提示) |
 | `template_format` (`'ansi'/'iso'`, 可读写) | 模板标准 |
 | `template_quality(template)` | 模板质量分 |
 | `device_ok` | 设备状态 |
