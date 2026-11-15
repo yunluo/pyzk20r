@@ -18,6 +18,8 @@ jobs:
       # lint 工具用 uvx 隔离运行, 不受项目 requires-python 约束影响
       - name: ruff lint
         run: uvx ruff check .
+      - name: ruff format 检查
+        run: uvx ruff format --check .
       - name: mypy 类型检查
         run: uvx --from "mypy>=1.10" mypy src/pyzk20r
       - name: 构建产物校验

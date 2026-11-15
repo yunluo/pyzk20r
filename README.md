@@ -29,14 +29,14 @@ pip install pyzk20r
 from pyzk20r import FingerprintDB, MatchError, Scanner
 
 db = FingerprintDB()
-with Scanner() as dev:                       # 构造即打开, 退出自动关闭
-    print(dev.info())                        # 厂商/产品名/序列号/VID&PID
+with Scanner() as dev:  # 构造即打开, 退出自动关闭
+    print(dev.info())  # 厂商/产品名/序列号/VID&PID
 
     # 登记: 采 3 次自动合并入库 (同一工号可多次调用 = 多枚指纹)
     tpl = db.enroll(dev, user_id="1001")
 
     # 1:N 识别 -> (user_id, 分数)
-    frame = dev.acquire()                    # 阻塞等待一次按压
+    frame = dev.acquire()  # 阻塞等待一次按压
     uid, score = db.identify(frame.template)
 
     # 1:1 验证 -> 分数 (对该用户所有指纹取最优)
@@ -47,9 +47,9 @@ with Scanner() as dev:                       # 构造即打开, 退出自动关�
 
 ```python
 with Scanner() as dev:
-    for frame in dev.capture(poll_interval=0.1):   # 暂无手指时自动重试
-        open("finger.bmp", "wb").write(frame.to_bmp())   # 图像存 BMP
-        tpl = frame.template                             # 提取好的模板
+    for frame in dev.capture(poll_interval=0.1):  # 暂无手指时自动重试
+        open("finger.bmp", "wb").write(frame.to_bmp())  # 图像存 BMP
+        tpl = frame.template  # 提取好的模板
         break
 ```
 
@@ -124,10 +124,11 @@ ZKFPMError (含 .code 原始 SDK 错误码)
 
 ```python
 import json
-data = db.dump()                                   # {"version": 1, "templates": [[uid, "BASE64"], ...]}
+
+data = db.dump()  # {"version": 1, "templates": [[uid, "BASE64"], ...]}
 json.dump(data, open("fingers.json", "w"))
 
-db = FingerprintDB.load(json.load(open("fingers.json")))   # 启动时重建, 无需重新按手指
+db = FingerprintDB.load(json.load(open("fingers.json")))  # 启动时重建, 无需重新按手指
 ```
 
 SQLite 存取完整示例见 `examples/persist.py`。

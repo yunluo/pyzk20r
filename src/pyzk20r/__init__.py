@@ -33,12 +33,24 @@ __version__ = "0.1.1"
 
 __all__ = [
     # 核心
-    "Scanner", "Frame", "DeviceInfo", "FingerprintDB",
+    "Scanner",
+    "Frame",
+    "DeviceInfo",
+    "FingerprintDB",
     # 枚举
-    "ZKFPErr", "Param", "DBParam", "MAX_TEMPLATE_SIZE",
+    "ZKFPErr",
+    "Param",
+    "DBParam",
+    "MAX_TEMPLATE_SIZE",
     # 异常
-    "ZKFPMError", "DeviceError", "DeviceNotFoundError", "CaptureError",
-    "MatchError", "MergeError", "ExtractError", "LibraryError",
+    "ZKFPMError",
+    "DeviceError",
+    "DeviceNotFoundError",
+    "CaptureError",
+    "MatchError",
+    "MergeError",
+    "ExtractError",
+    "LibraryError",
     # 底层 (高级用法/测试注入)
     "_binding",
 ]

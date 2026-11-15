@@ -1,5 +1,6 @@
 # -*- coding: utf-8 -*-
 """Scanner / Frame 设备层测试 (FakeDLL 注入, 无真设备)。"""
+
 import struct
 
 import pytest
@@ -127,7 +128,7 @@ def test_acquire_waits_for_finger(fake_dll):
 
 
 def test_capture_generator_retries_transient(fake_dll):
-    fake_dll.acquire_queue = [-8, 0]               # 一次失败后成功
+    fake_dll.acquire_queue = [-8, 0]  # 一次失败后成功
     with Scanner() as dev:
         gen = dev.capture(poll_interval=0)
         frame = next(gen)
@@ -155,7 +156,7 @@ def test_enroll_no_times_parameter(fake_dll):
     """enroll 固定采 3 次, 不再接受 times 参数 (SDK 合并要求)。"""
     dev = Scanner()
     with pytest.raises(TypeError):
-        dev.enroll(times=5)                        # type: ignore[call-arg]
+        dev.enroll(times=5)  # type: ignore[call-arg]
     dev.close()
 
 
@@ -206,12 +207,12 @@ def test_frame_to_bmp_layout(fake_dll):
 
 def test_frame_to_bmp_bottom_up(fake_dll):
     """最后一行像素在 BMP 头之后最先出现 (自底向上)。"""
-    image = bytes(range(16))                        # 4x4 图
+    image = bytes(range(16))  # 4x4 图
     frame = Frame(image, TEMPLATE, 4, 4, 500)
     bmp = frame.to_bmp()
-    body = bmp[14 + 40 + 1024:]
-    assert body[:4] == image[12:16]                 # 第 3 行 (最底行) 在最前
-    assert body[-4:] == image[0:4]                  # 第 0 行 (最顶行) 在最后
+    body = bmp[14 + 40 + 1024 :]
+    assert body[:4] == image[12:16]  # 第 3 行 (最底行) 在最前
+    assert body[-4:] == image[0:4]  # 第 0 行 (最顶行) 在最后
 
 
 def test_error_code_preserved(fake_dll):

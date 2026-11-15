@@ -3,6 +3,7 @@
 
 本模块不依赖 _binding, 避免循环导入; 错误码表使用原生 int。
 """
+
 from __future__ import absolute_import
 
 try:
@@ -11,8 +12,15 @@ except ImportError:  # pragma: no cover -- 精简环境缺 typing 时的提示
     raise ImportError("缺少 typing 模块, 请安装: pip install typing")
 
 __all__ = [
-    "ZKFPMError", "DeviceError", "DeviceNotFoundError", "CaptureError",
-    "MatchError", "MergeError", "ExtractError", "LibraryError", "raise_for",
+    "ZKFPMError",
+    "DeviceError",
+    "DeviceNotFoundError",
+    "CaptureError",
+    "MatchError",
+    "MergeError",
+    "ExtractError",
+    "LibraryError",
+    "raise_for",
 ]
 
 
@@ -21,7 +29,7 @@ class ZKFPMError(RuntimeError):
 
     def __init__(self, code: int, message: Optional[str] = None) -> None:
         self.code = int(code)
-        super(ZKFPMError, self).__init__(message or ("SDK 错误码 %d" % self.code))
+        super(ZKFPMError, self).__init__(message or ("SDK 错误码 {:d}".format(self.code)))
 
 
 class DeviceError(ZKFPMError):
@@ -54,22 +62,22 @@ class LibraryError(ZKFPMError):
 
 #: 错误码 -> 异常类 的映射 (未列出用 fallback)
 _ERROR_CLASS_BY_CODE = {
-    -3: DeviceNotFoundError,      # 无设备连接
-    -6: DeviceNotFoundError,      # 打开设备失败
-    -8: CaptureError,             # 取像失败
-    -12: CaptureError,            # 设备正在采集
-    -18: CaptureError,            # 取消采集
-    -28: CaptureError,            # 超时
-    -9: ExtractError,             # 提取模板失败
-    -26: ExtractError,            # 文件打开失败
-    -27: ExtractError,            # 处理图像失败
-    -20: MatchError,              # 比对失败
-    -22: MergeError,              # 合并失败
-    -2: LibraryError,             # 初始化采集库失败
-    -1: LibraryError,             # 初始化算法库失败
-    -13: LibraryError,            # 添加模板失败
-    -14: LibraryError,            # 删除模板失败
-    -17: LibraryError,            # 操作失败
+    -3: DeviceNotFoundError,  # 无设备连接
+    -6: DeviceNotFoundError,  # 打开设备失败
+    -8: CaptureError,  # 取像失败
+    -12: CaptureError,  # 设备正在采集
+    -18: CaptureError,  # 取消采集
+    -28: CaptureError,  # 超时
+    -9: ExtractError,  # 提取模板失败
+    -26: ExtractError,  # 文件打开失败
+    -27: ExtractError,  # 处理图像失败
+    -20: MatchError,  # 比对失败
+    -22: MergeError,  # 合并失败
+    -2: LibraryError,  # 初始化采集库失败
+    -1: LibraryError,  # 初始化算法库失败
+    -13: LibraryError,  # 添加模板失败
+    -14: LibraryError,  # 删除模板失败
+    -17: LibraryError,  # 操作失败
 }
 
 

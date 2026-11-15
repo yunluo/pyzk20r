@@ -1,5 +1,6 @@
 # -*- coding: utf-8 -*-
 """pytest fixtures: 注入伪造的 libzkfp.dll 函数表, 不依赖真设备。"""
+
 import ctypes
 import struct
 import sys
@@ -12,9 +13,9 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
 from pyzk20r import _binding  # noqa: E402
 
 WIDTH, HEIGHT, DPI = 256, 360, 500
-TEMPLATE = bytes(range(1, 65))                     # 64 字节假模板
+TEMPLATE = bytes(range(1, 65))  # 64 字节假模板
 IMAGE = bytes((i % 251 for i in range(WIDTH * HEIGHT)))
-MERGED = bytes(range(1, 97))                       # 假登记模板
+MERGED = bytes(range(1, 97))  # 假登记模板
 
 
 class FakeDLL:
@@ -25,14 +26,14 @@ class FakeDLL:
         self.open_ok = True
         self.init_ret = 0
         self.opened_index = None
-        self.acquire_queue = []                    # 0/元组=成功, 负数=错误码
-        self.set_params = {}                       # code -> bytes
-        self.db_adds = {}                          # fid -> bytes
-        self.db_params = {1: 35, 2: 55}            # 阈值
-        self.db_ident_result = (1, 99)             # (fid, score)
+        self.acquire_queue = []  # 0/元组=成功, 负数=错误码
+        self.set_params = {}  # code -> bytes
+        self.db_adds = {}  # fid -> bytes
+        self.db_params = {1: 35, 2: 55}  # 阈值
+        self.db_ident_result = (1, 99)  # (fid, score)
         self.db_ident_ret = 0
-        self.db_ident_user_map = {}                # fid -> score (给 verify 用)
-        self.verify_scores = {}                    # fid -> score
+        self.db_ident_user_map = {}  # fid -> score (给 verify 用)
+        self.verify_scores = {}  # fid -> score
         self.match_score = 88
         self.merge_ret = 0
         self.extract_ret = 0
@@ -99,10 +100,10 @@ class FakeDLL:
 
     def _pop_acquire(self):
         if not self.acquire_queue:
-            return ("ok", IMAGE[:WIDTH * HEIGHT], TEMPLATE)
+            return ("ok", IMAGE[: WIDTH * HEIGHT], TEMPLATE)
         item = self.acquire_queue.pop(0)
         if isinstance(item, int) and item == 0:
-            return ("ok", IMAGE[:WIDTH * HEIGHT], TEMPLATE)
+            return ("ok", IMAGE[: WIDTH * HEIGHT], TEMPLATE)
         return item
 
     def ZKFPM_AcquireFingerprint(self, handle, img_buf, img_len, tpl_buf, plen):

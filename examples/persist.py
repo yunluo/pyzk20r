@@ -4,6 +4,7 @@
 首次运行: 登记 2 个用户并入库到 fingers.db;
 再次运行: 从 fingers.db 恢复内存库, 直接进入识别循环 (无需重新按手指登记)。
 """
+
 import os
 import sqlite3
 
@@ -28,8 +29,7 @@ def open_store():
 def load_db(conn):
     """从存储恢复内存指纹库。"""
     db = FingerprintDB()
-    for user_id, tpl in conn.execute(
-            "SELECT user_id, tpl FROM templates ORDER BY user_id, seq"):
+    for user_id, tpl in conn.execute("SELECT user_id, tpl FROM templates ORDER BY user_id, seq"):
         db.add(user_id, tpl)
     return db
 
@@ -52,14 +52,14 @@ def main():
         db = FingerprintDB()
         with Scanner() as dev:
             for uid in ("1001", "1002"):
-                print("工号 %s: 请按压手指 3 次..." % uid)
+                print("工号 {}: 请按压手指 3 次...".format(uid))
                 templates = dev.enroll()
                 db.add(uid, db.merge(templates))
                 save_user(conn, uid, db.fingers_of(uid))
-                print("  已登记并写入 %s" % DB_FILE)
+                print("  已登记并写入 {}".format(DB_FILE))
     else:
         db = load_db(conn)
-        print("从 %s 恢复 %d 枚指纹: 用户 %s" % (DB_FILE, db.count, db.users))
+        print("从 {} 恢复 {:d} 枚指纹: 用户 {}".format(DB_FILE, db.count, db.users))
 
     print("进入识别循环, Ctrl+C 退出")
     try:
@@ -67,7 +67,11 @@ def main():
             for frame in dev.capture(poll_interval=0.1):
                 try:
                     uid, score = db.identify(frame.template)
-                    print("识别成功: 用户 %d, 分数 %d (阈值 %d)" % (uid, score, db.threshold_1_n))
+                    print(
+                        "识别成功: 用户 {:d}, 分数 {:d} (阈值 {:d})".format(
+                            uid, score, db.threshold_1_n
+                        )
+                    )
                 except MatchError:
                     print("未识别")
     except KeyboardInterrupt:

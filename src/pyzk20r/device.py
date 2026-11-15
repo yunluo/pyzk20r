@@ -14,6 +14,7 @@
 子类可覆写 ``on_enroll_progress`` / ``acquire`` / ``_try_acquire`` 等钩子。
 语法兼容 Python 3.7 (Windows XP): 类型标注用内联标注 (PEP 3107) + typing 构造。
 """
+
 from __future__ import absolute_import
 
 import ctypes
@@ -41,9 +42,13 @@ __all__ = ["DeviceInfo", "Frame", "Scanner"]
 
 #: 允许静默重试的瞬态采集错误码 (通常表示"暂无手指")。
 #: 不含 ABSORT/CANCEL —— 它们是显式中止信号, 持续出现说明有真实问题, 不应死循环。
-_TRANSIENT_CAPTURE_CODES = frozenset((
-    ZKFPErr.CAPTURE, ZKFPErr.BUSY, ZKFPErr.TIMEOUT,
-))
+_TRANSIENT_CAPTURE_CODES = frozenset(
+    (
+        ZKFPErr.CAPTURE,
+        ZKFPErr.BUSY,
+        ZKFPErr.TIMEOUT,
+    )
+)
 
 #: LED 颜色名 -> 参数代码
 _LED_CODES = {
@@ -78,24 +83,29 @@ class Frame:
         """图像转 8 位灰度 BMP 字节流 (纯 stdlib, 无 PIL 依赖)。"""
         if len(self.image) < self.width * self.height:
             raise ValueError(
-                "image 数据不足: %d 字节 < %dx%d" % (len(self.image), self.width, self.height))
+                "image 数据不足: {:d} 字节 < {:d}x{:d}".format(
+                    len(self.image), self.width, self.height
+                )
+            )
         row_size = self.width + (4 - self.width % 4) % 4
         body_size = row_size * self.height
         palette = b"".join(struct.pack("BBBB", i, i, i, 0) for i in range(256))
         offset = 14 + 40 + len(palette)
         header = struct.pack("<2sIHHI", b"BM", offset + body_size, 0, 0, offset)
         info = struct.pack(
-            "<IiiHHIIiiII", 40, self.width, self.height, 1, 8, 0, body_size, 0, 0, 0, 0)
+            "<IiiHHIIiiII", 40, self.width, self.height, 1, 8, 0, body_size, 0, 0, 0, 0
+        )
         parts = [header, info, palette]
-        for y in range(self.height - 1, -1, -1):          # BMP 自底向上
+        for y in range(self.height - 1, -1, -1):  # BMP 自底向上
             start = y * self.width
-            parts.append(self.image[start:start + self.width])
+            parts.append(self.image[start : start + self.width])
             parts.append(b"\x00" * (row_size - self.width))
         return b"".join(parts)
 
     def __repr__(self) -> str:
-        return "Frame(template=%d bytes, image=%dx%d@%ddpi)" % (
-            len(self.template), self.width, self.height, self.dpi)
+        return "Frame(template={:d} bytes, image={:d}x{:d}@{:d}dpi)".format(
+            len(self.template), self.width, self.height, self.dpi
+        )
 
 
 class Scanner:
@@ -111,7 +121,7 @@ class Scanner:
     def __init__(self, index: int = 0, dll_path: Optional[str] = None) -> None:
         self._index = int(index)
         self._dll_path = dll_path
-        self._handle = None                            # type: Optional[int]
+        self._handle = None  # type: Optional[int]
         self.open()
 
     # -- 生命周期 -----------------------------------------------------------
@@ -127,7 +137,7 @@ class Scanner:
         handle = dll.ZKFPM_OpenDevice(self._index)
         if not handle:
             _binding.lib_release()
-            raise DeviceNotFoundError(ZKFPErr.OPEN, "打开设备失败 (index=%d)" % self._index)
+            raise DeviceNotFoundError(ZKFPErr.OPEN, "打开设备失败 (index={:d})".format(self._index))
         self._handle = handle
 
     def close(self) -> None:
@@ -155,7 +165,7 @@ class Scanner:
         return self._handle
 
     def __repr__(self) -> str:
-        return "Scanner(index=%d, closed=%s)" % (self._index, self.closed)
+        return "Scanner(index={:d}, closed={})".format(self._index, self.closed)
 
     # -- 参数 ---------------------------------------------------------------
 
@@ -165,8 +175,8 @@ class Scanner:
         buf = ctypes.create_string_buffer(size)
         n = ctypes.c_uint(size)
         ret = _binding.get_dll().ZKFPM_GetParameters(handle, int(code), buf, ctypes.byref(n))
-        raise_for(ret, "读取参数 %d 失败" % code, DeviceError)
-        return buf.raw[:n.value]
+        raise_for(ret, "读取参数 {:d} 失败".format(code), DeviceError)
+        return buf.raw[: n.value]
 
     def get_param_int(self, code: int) -> int:
         """读取 int 型参数。"""
@@ -177,7 +187,7 @@ class Scanner:
         handle = self._require_open()
         buf = ctypes.create_string_buffer(struct.pack("<i", int(value)), 4)
         ret = _binding.get_dll().ZKFPM_SetParameters(handle, int(code), buf, 4)
-        raise_for(ret, "设置参数 %d 失败" % code, DeviceError)
+        raise_for(ret, "设置参数 {:d} 失败".format(code), DeviceError)
 
     def get_param_str(self, code: int) -> str:
         """读取字符串型参数 (厂商/产品名/序列号)。忽略不可解码字节 (Windows ANSI)。"""
@@ -198,7 +208,7 @@ class Scanner:
 
     @dpi.setter
     def dpi(self, value: int) -> None:
-        self.set_param_int(Param.DPI, value)          # Live20R 可写, 例如儿童指纹建议 750/1000
+        self.set_param_int(Param.DPI, value)  # Live20R 可写, 例如儿童指纹建议 750/1000
 
     @property
     def fake_detect(self) -> bool:
@@ -238,14 +248,14 @@ class Scanner:
 
     def info(self) -> DeviceInfo:
         raw = self.get_param_bytes(Param.VID_PID, 4)
-        if len(raw) < 4:                             # 部分固件不回填, 防御 struct.error
+        if len(raw) < 4:  # 部分固件不回填, 防御 struct.error
             raw = (raw + b"\x00\x00\x00\x00")[:4]
         vid, pid = struct.unpack("<HH", raw)
         return DeviceInfo(
             vendor=self.get_param_str(Param.VENDOR),
             product=self.get_param_str(Param.PRODUCT_NAME),
             serial=self.get_param_str(Param.SERIAL_NUMBER),
-            vid_pid="VID_%04X PID_%04X" % (vid, pid),
+            vid_pid="VID_{:04X} PID_{:04X}".format(vid, pid),
         )
 
     def template_quality(self, template: bytes) -> int:
@@ -264,7 +274,8 @@ class Scanner:
         handle = self._require_open()
         w, h, dpi = ctypes.c_int(), ctypes.c_int(), ctypes.c_int()
         ret = _binding.get_dll().ZKFPM_GetCaptureParamsEx(
-            handle, ctypes.byref(w), ctypes.byref(h), ctypes.byref(dpi))
+            handle, ctypes.byref(w), ctypes.byref(h), ctypes.byref(dpi)
+        )
         raise_for(ret, "获取采集参数失败", DeviceError)
         return w.value, h.value, dpi.value
 
@@ -285,9 +296,10 @@ class Scanner:
         tpl_buf = ctypes.create_string_buffer(MAX_TEMPLATE_SIZE)
         tpl_len = ctypes.c_uint(MAX_TEMPLATE_SIZE)
         ret = _binding.get_dll().ZKFPM_AcquireFingerprint(
-            handle, img_buf, width * height, tpl_buf, ctypes.byref(tpl_len))
+            handle, img_buf, width * height, tpl_buf, ctypes.byref(tpl_len)
+        )
         if ret == ZKFPErr.OK:
-            return Frame(img_buf.raw, tpl_buf.raw[:tpl_len.value], width, height, dpi)
+            return Frame(img_buf.raw, tpl_buf.raw[: tpl_len.value], width, height, dpi)
         if int(ret) in _TRANSIENT_CAPTURE_CODES:
             return None
         raise error_class(int(ret))(int(ret), "采集失败")
@@ -305,7 +317,7 @@ class Scanner:
             if frame is not None:
                 return frame
             if deadline is not None and time.monotonic() >= deadline:
-                raise CaptureError(int(ZKFPErr.CAPTURE), "取像超时 (%s 秒)" % timeout)
+                raise CaptureError(int(ZKFPErr.CAPTURE), "取像超时 ({} 秒)".format(timeout))
             if poll_interval > 0:
                 time.sleep(poll_interval)
 
@@ -328,7 +340,7 @@ class Scanner:
         每成功一次调用一次 :meth:`on_enroll_progress` 钩子。
         """
         total = 3
-        templates = []                                 # type: List[bytes]
+        templates = []  # type: List[bytes]
         while len(templates) < total:
             frame = self._try_acquire()
             if frame is None:

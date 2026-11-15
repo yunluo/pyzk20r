@@ -1,5 +1,6 @@
 # -*- coding: utf-8 -*-
 """整合流程测试: 登记 -> 识别 -> 验证 全链路 (FakeDLL 注入) 与语法守卫。"""
+
 import ast
 import os
 import sys
@@ -17,12 +18,13 @@ PKG_DIR = os.path.join(REPO_DIR, "src", "pyzk20r")
 # 全链路整合
 # ---------------------------------------------------------------------------
 
+
 def test_enroll_identify_verify_flow(fake_dll):
     """登记 2 人各 1 枚 -> 识别返回对应用户 -> 1:1 验证通过。"""
     db = FingerprintDB()
     with Scanner() as dev:
         db.enroll(dev, user_id="1001", poll_interval=0)
-        assert fake_dll.db_adds[1] == MERGED        # 3 次采集合并入库
+        assert fake_dll.db_adds[1] == MERGED  # 3 次采集合并入库
         assert db.count == 1
         db.add("1002", TEMPLATE)
         fake_dll.db_ident_result = (1, 97)
@@ -50,12 +52,45 @@ def test_enroll_multiple_fingers_same_user(fake_dll):
 # Python 3.7 语法守卫: 包内源码必须能在 3.7 语法下解析
 # ---------------------------------------------------------------------------
 
+
 def _package_sources():
     for name in sorted(os.listdir(PKG_DIR)):
         if name.endswith(".py"):
             path = os.path.join(PKG_DIR, name)
             with open(path, "rb") as f:
                 yield path, f.read().decode("utf-8")
+
+
+def _repo_python_sources():
+    """库源码 + 测试 + 示例 全部 .py 文件。"""
+    for sub in ("src", "tests", "examples"):
+        root = os.path.join(REPO_DIR, sub)
+        for dirpath, _dirs, files in os.walk(root):
+            for name in sorted(files):
+                if name.endswith(".py"):
+                    path = os.path.join(dirpath, name)
+                    with open(path, "rb") as f:
+                        yield path, f.read().decode("utf-8")
+
+
+def test_no_percent_string_formatting():
+    """禁止 % 风格字符串格式化, 一律使用 str.format()。
+
+    取模运算 (数值 % 整数) 不受影响, 只拦截 "字符串" % 参数 的形式。
+    """
+    for path, source in _repo_python_sources():
+        tree = ast.parse(source)
+        for node in ast.walk(tree):
+            if not (isinstance(node, ast.BinOp) and isinstance(node.op, ast.Mod)):
+                continue
+            left = node.left
+            if isinstance(left, ast.Constant):
+                value = left.value
+            else:
+                value = getattr(left, "s", None)  # Python 3.7: ast.Str
+            assert not isinstance(value, str), "{} 仍使用 % 格式化, 请改用 .format(): {}".format(
+                path, value
+            )
 
 
 @pytest.mark.skipif(sys.version_info < (3, 8), reason="ast feature_version 需 Python 3.8+")
@@ -70,8 +105,8 @@ def test_typing_import_guarded():
     for path, source in _package_sources():
         if "from typing import" not in source:
             continue
-        assert "except ImportError" in source, "%s 的 typing 导入未做兜底处理" % path
-        assert "pip install typing" in source, "%s 缺少 typing 安装提示" % path
+        assert "except ImportError" in source, "{} 的 typing 导入未做兜底处理".format(path)
+        assert "pip install typing" in source, "{} 缺少 typing 安装提示".format(path)
 
 
 def test_sources_use_inline_annotations():
@@ -86,8 +121,8 @@ def test_sources_use_inline_annotations():
         assert os.path.exists(path)
         with open(path, "rb") as f:
             src = f.read().decode("utf-8")
-        assert "# type: (" not in src, "%s 仍存在旧式签名注释标注" % name
-        assert "-> " in src, "%s 缺少内联返回类型标注" % name
+        assert "# type: (" not in src, "{} 仍存在旧式签名注释标注".format(name)
+        assert "-> " in src, "{} 缺少内联返回类型标注".format(name)
         tree = ast.parse(src)
         for node in ast.walk(tree):
             if not isinstance(node, ast.FunctionDef):
@@ -99,12 +134,14 @@ def test_sources_use_inline_annotations():
                 if ann is None:
                     continue
                 assert not (isinstance(ann, ast.Constant) and isinstance(ann.value, str)), (
-                    "%s 存在带引号的字符串标注: %s" % (name, ast.dump(ann)))
+                    "{} 存在带引号的字符串标注: {}".format(name, ast.dump(ann))
+                )
 
 
 @pytest.mark.parametrize("name", ["Scanner", "FingerprintDB", "Frame", "ZKFPMError"])
 def test_public_api_exported(name):
     import pyzk20r
+
     assert hasattr(pyzk20r, name)
     assert name in pyzk20r.__all__
 
@@ -114,6 +151,7 @@ def test_version_consistent_with_pyproject():
     import re
 
     import pyzk20r
+
     pyproject = os.path.join(REPO_DIR, "pyproject.toml")
     with open(pyproject, "rb") as f:
         text = f.read().decode("utf-8")

@@ -4,6 +4,7 @@
 用真机跑全流程 (登记/识别) 见 examples/ 目录脚本。
 可用 `-m "not real_device"` 取消勾选。
 """
+
 import ctypes
 import sys
 
@@ -21,10 +22,10 @@ def test_real_device_smoke():
     try:
         dll = _binding.load_dll()
     except OSError as e:
-        pytest.skip("libzkfp.dll 不可用 (未装驱动): %s" % e)
+        pytest.skip("libzkfp.dll 不可用 (未装驱动): {}".format(e))
     ret = dll.ZKFPM_Init()
     if ret not in (0, 1):
-        pytest.skip("ZKFPM_Init 失败 (%d)" % ret)
+        pytest.skip("ZKFPM_Init 失败 ({:d})".format(ret))
     try:
         if dll.ZKFPM_GetDeviceCount() < 1:
             pytest.skip("未连接 Live20R 设备")
@@ -33,12 +34,13 @@ def test_real_device_smoke():
         try:
             w, h, dpi = ctypes.c_int(), ctypes.c_int(), ctypes.c_int()
             ret = dll.ZKFPM_GetCaptureParamsEx(
-                handle, ctypes.byref(w), ctypes.byref(h), ctypes.byref(dpi))
-            assert ret == 0, "获取采集参数失败 (%d)" % ret
-            assert w.value > 0 and h.value > 0, "图像尺寸异常: %dx%d" % (w.value, h.value)
+                handle, ctypes.byref(w), ctypes.byref(h), ctypes.byref(dpi)
+            )
+            assert ret == 0, "获取采集参数失败 ({:d})".format(ret)
+            assert w.value > 0 and h.value > 0, "图像尺寸异常: {:d}x{:d}".format(w.value, h.value)
             # 部分 SLK20R 固件 dpi 读数为 0, 只在非 0 时校验范围
             if dpi.value:
-                assert 300 <= dpi.value <= 1500, "DPI 异常: %d" % dpi.value
+                assert 300 <= dpi.value <= 1500, "DPI 异常: {:d}".format(dpi.value)
         finally:
             assert dll.ZKFPM_CloseDevice(handle) == 0
     finally:

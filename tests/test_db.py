@@ -1,5 +1,6 @@
 # -*- coding: utf-8 -*-
 """FingerprintDB 测试: 一人多指纹、识别映射、阈值 (FakeDLL 注入)。"""
+
 import pytest
 from conftest import MERGED, TEMPLATE
 
@@ -44,11 +45,11 @@ def test_identify_maps_fid_to_user(fake_dll):
         db.add("1001", TPL_A)
         db.add("1001", TPL_B)
         db.add("2002", TPL_C)
-        fake_dll.db_ident_result = (2, 95)         # fid=2 => "1001" 的第二枚
+        fake_dll.db_ident_result = (2, 95)  # fid=2 => "1001" 的第二枚
         user_id, score = db.identify(TPL_B)
         assert user_id == "1001"
         assert score == 95
-        fake_dll.db_ident_result = (3, 60)         # fid=3 => "2002"
+        fake_dll.db_ident_result = (3, 60)  # fid=3 => "2002"
         assert db.identify(TPL_C) == ("2002", 60)
 
 
@@ -171,9 +172,10 @@ def test_dump_load_roundtrip(fake_dll):
 
 def test_dump_load_json_roundtrip(fake_dll):
     import json
+
     db = FingerprintDB()
     db.add("7", TPL_A)
-    text = json.dumps(db.dump())                   # 应用层用 json 落盘
+    text = json.dumps(db.dump())  # 应用层用 json 落盘
     db.close()
     db2 = FingerprintDB.load(json.loads(text))
     assert db2.fingers_of("7") == [TPL_A]
@@ -184,7 +186,7 @@ def test_load_rejects_bad_payload(fake_dll):
     with pytest.raises(ValueError):
         FingerprintDB.load({"version": 99, "templates": []})
     with pytest.raises(ValueError):
-        FingerprintDB.load({"version": 2})         # 缺 templates
+        FingerprintDB.load({"version": 2})  # 缺 templates
     with pytest.raises(ValueError):
         FingerprintDB.load({"version": 2, "templates": [["not-a-list"]]})
     with pytest.raises(ValueError):
@@ -211,7 +213,7 @@ def test_identify_unmapped_fid_raises(fake_dll):
     """SDK 返回的 fid 不在映射内 (如被 clear 过) → MatchError 而非 KeyError。"""
     with FingerprintDB() as db:
         db.add("1001", TPL_A)
-        fake_dll.db_ident_result = (99, 88)        # fid=99 从未入库
+        fake_dll.db_ident_result = (99, 88)  # fid=99 从未入库
         with pytest.raises(MatchError):
             db.identify(TPL_A)
 
@@ -250,14 +252,14 @@ def test_verify_mixed_error_and_match_returns_score(fake_dll):
 def test_numeric_worker_id_normalized(fake_dll):
     """数字工号: int 与 str 等价 (52193652 == "52193652"), identify 永远返回 str。"""
     with FingerprintDB() as db:
-        db.add(52193652, TPL_A)                        # int 形式登记
+        db.add(52193652, TPL_A)  # int 形式登记
         assert db.users == ["52193652"]
-        assert db.fingers_of(52193652) == [TPL_A]      # int 查询命中
-        assert db.fingers_of("52193652") == [TPL_A]    # str 查询命中同一工号
+        assert db.fingers_of(52193652) == [TPL_A]  # int 查询命中
+        assert db.fingers_of("52193652") == [TPL_A]  # str 查询命中同一工号
         fake_dll.db_ident_result = (1, 90)
         assert db.identify(TPL_A) == ("52193652", 90)  # 识别返回归一化字符串
         fake_dll.verify_scores = {1: 88}
-        assert db.verify(52193652, TPL_A) == 88        # int 形式 1:1 验证
+        assert db.verify(52193652, TPL_A) == 88  # int 形式 1:1 验证
         db.remove(52193652)
         assert db.users == []
 
@@ -275,8 +277,8 @@ def test_load_accepts_v1_int_ids(fake_dll):
     """v1 持久化结构 (整数工号) 仍可读取, 载入后归一化为字符串。"""
     import base64
     import json
-    data = {"version": 1,
-            "templates": [[1001, base64.b64encode(TPL_A).decode("ascii")]]}
+
+    data = {"version": 1, "templates": [[1001, base64.b64encode(TPL_A).decode("ascii")]]}
     db2 = FingerprintDB.load(json.loads(json.dumps(data)))
     assert db2.users == ["1001"]
     assert db2.fingers_of("1001") == [TPL_A]
