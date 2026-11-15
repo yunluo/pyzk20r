@@ -17,9 +17,7 @@ from pyzk20r import _binding
 
 
 @unittest.skipUnless(sys.platform == "win32", "Windows only")
-@unittest.skipUnless(
-    os.environ.get("PYZK20R_REAL_SMOKE") == "1", "set PYZK20R_REAL_SMOKE=1 to enable"
-)
+@unittest.skipUnless(os.environ.get("PYZK20R_REAL_SMOKE") == "1", "set PYZK20R_REAL_SMOKE=1 to enable")
 class TestRealDeviceSmoke(unittest.TestCase):
     """连接真机时验证底层链路; 无驱动/无设备自动 skip。"""
 
