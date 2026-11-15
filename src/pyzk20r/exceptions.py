@@ -7,9 +7,8 @@ from __future__ import absolute_import
 
 try:
     from typing import Optional
-except ImportError:  # pragma: no cover -- Python 3.4 (typing 不在标准库)
-    raise ImportError(
-        "Python 3.4 需要 typing 后备包: pip install typing==3.7.4.3")
+except ImportError:  # pragma: no cover -- 精简环境缺 typing 时的提示
+    raise ImportError("缺少 typing 模块, 请安装: pip install typing")
 
 __all__ = [
     "ZKFPMError", "DeviceError", "DeviceNotFoundError", "CaptureError",

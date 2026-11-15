@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-"""整合流程测试: 登记 -> 识别 -> 验证 全链路 (FakeDLL 注入) 与 3.4 语法守卫。"""
+"""整合流程测试: 登记 -> 识别 -> 验证 全链路 (FakeDLL 注入) 与语法守卫。"""
 import ast
 import os
 import sys
@@ -59,27 +59,19 @@ def _package_sources():
 
 
 @pytest.mark.skipif(sys.version_info < (3, 8), reason="ast feature_version 需 Python 3.8+")
-def test_sources_parse_as_py34():
-    """feature_version=(3,4) 拒绝 3.5+ 语法 (f-string/变量标注/async 等)。"""
+def test_sources_parse_as_py37():
+    """feature_version=(3,7) 拒绝 3.8+ 语法 (海象运算符/仅位置参数/赋值表达式 等)。"""
     for path, source in _package_sources():
-        ast.parse(source, filename=path, feature_version=(3, 4))
+        ast.parse(source, filename=path, feature_version=(3, 7))
 
 
-def test_sources_have_no_fstring():
-    """禁 f-string (3.4 不支持)。"""
-    for path, source in _package_sources():
-        tree = ast.parse(source)
-        for node in ast.walk(tree):
-            assert not isinstance(node, ast.JoinedStr), "f-string 禁用于 3.4: %s" % path
-
-
-def test_typing_import_guarded_for_py34():
-    """typing 导入必须用 try/except 包裹, 并在缺失时给出 3.4 后备包提示。"""
+def test_typing_import_guarded():
+    """typing 导入必须用 try/except 包裹, 缺失时给出明确提示。"""
     for path, source in _package_sources():
         if "from typing import" not in source:
             continue
-        assert "except ImportError" in source, "%s 的 typing 导入未做 3.4 兼容处理" % path
-        assert "typing==3.7.4.3" in source, "%s 缺少 typing 后备包安装提示" % path
+        assert "except ImportError" in source, "%s 的 typing 导入未做兜底处理" % path
+        assert "pip install typing" in source, "%s 缺少 typing 安装提示" % path
 
 
 def test_sources_use_inline_annotations():

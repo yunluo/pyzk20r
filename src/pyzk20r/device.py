@@ -12,8 +12,7 @@
             break
 
 子类可覆写 ``on_enroll_progress`` / ``acquire`` / ``_try_acquire`` 等钩子。
-语法兼容 Python 3.4 (Windows XP): 类型标注用内联标注 (PEP 3107) + typing 构造
-(Python 3.4 需装 typing 后备包)。
+语法兼容 Python 3.7 (Windows XP): 类型标注用内联标注 (PEP 3107) + typing 构造。
 """
 from __future__ import absolute_import
 
@@ -35,9 +34,8 @@ from .exceptions import (
 
 try:
     from typing import Generator, List, Optional, Tuple
-except ImportError:  # pragma: no cover -- Python 3.4 (typing 不在标准库)
-    raise ImportError(
-        "Python 3.4 需要 typing 后备包: pip install typing==3.7.4.3")
+except ImportError:  # pragma: no cover -- 精简环境缺 typing 时的提示
+    raise ImportError("缺少 typing 模块, 请安装: pip install typing")
 
 __all__ = ["DeviceInfo", "Frame", "Scanner"]
 
