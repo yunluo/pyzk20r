@@ -44,15 +44,25 @@ jobs:
     environment: pypi
     permissions:
       id-token: write                    # PyPI Trusted Publishing (OIDC)
+    env:
+      PYPI_API_TOKEN: ${{ secrets.PYPI_API_TOKEN }}
     steps:
       - uses: actions/download-artifact@v4
         with:
           name: dist
           path: dist/
-      # 前置: 在 pypi.org 的 pyzk20r 项目页配置 Trusted Publisher
-      #   owner=yunluo  repo=pyzk_20r  workflow=release.yml  environment=pypi
-      # 若改用 API Token: 在 repo Secrets 添加 PYPI_API_TOKEN, 并把下面 step 改为
-      #   with: password: ${{ secrets.PYPI_API_TOKEN }}  (并移除 permissions.id-token)
-      - uses: pypa/gh-action-pypi-publish@release/v1
+      # 凭据二选一:
+      #   1) 仓库 Secrets 配置 PYPI_API_TOKEN (pypi.org 的 API token, 需勾选 pyzk20r 项目)
+      #   2) 或用 Trusted Publishing: pypi.org 项目页配置 publisher
+      #      owner=yunluo repo=pyzk_20r workflow=release.yml environment=pypi
+      - name: 发布 PyPI (API Token)
+        if: env.PYPI_API_TOKEN != ''
+        uses: pypa/gh-action-pypi-publish@release/v1
+        with:
+          password: ${{ secrets.PYPI_API_TOKEN }}
+          packages-dir: dist/
+      - name: 发布 PyPI (Trusted Publishing)
+        if: env.PYPI_API_TOKEN == ''
+        uses: pypa/gh-action-pypi-publish@release/v1
         with:
           packages-dir: dist/

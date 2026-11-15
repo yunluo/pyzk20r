@@ -15,13 +15,14 @@ jobs:
       - uses: astral-sh/setup-uv@v5
         with:
           python-version: "3.12"
-      # lint 工具用 uvx 隔离运行, 不受项目 requires-python 约束影响
+      # lint 工具用 uvx 隔离运行 (不受项目 requires-python 约束影响);
+      # 版本锁定在本地验证过的区间, 避免格式化规则随版本漂移导致误报
       - name: ruff lint
-        run: uvx ruff check .
+        run: uvx "ruff>=0.17,<0.18" check .
       - name: ruff format 检查
-        run: uvx ruff format --check .
+        run: uvx "ruff>=0.17,<0.18" format --check .
       - name: mypy 类型检查
-        run: uvx --from "mypy>=1.10" mypy src/pyzk20r
+        run: uvx --from "mypy>=2.4,<3" mypy src/pyzk20r
       - name: 构建产物校验
         run: uv build
 
