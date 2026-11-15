@@ -24,12 +24,17 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0        # 需要完整 tag 历史才能发现版本漂移
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
       - uses: astral-sh/setup-uv@v5
         with:
           python-version: "3.12"
-      - name: 校验 tag 与包版本一致 (vX.Y.Z <-> pyproject version)
-        run: |
-          python3 -c "import os, re; tag = os.environ['GITHUB_REF_NAME']; text = open('pyproject.toml', encoding='utf-8').read(); v = re.search(r'(?m)^version = \"(.+)\"', text).group(1); assert v == tag[1:], 'tag {} 与 pyproject version {} 不一致'.format(tag, v)"
+      # 校验 tag 与包版本一致 (vX.Y.Z <-> pyproject version / __version__), 有漂移直接失败
+      - name: 校验 tag 与包版本一致
+        run: python scripts/version.py check --tag "${GITHUB_REF_NAME}"
       - name: 构建 wheel + sdist
         run: uv build
       - uses: actions/upload-artifact@v4

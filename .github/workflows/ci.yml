@@ -26,6 +26,20 @@ jobs:
       - name: 构建产物校验
         run: uv build
 
+  version:
+    name: 版本一致性检查
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0        # 需要完整 tag 历史才能发现版本漂移
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      # 校验 pyproject.toml / __init__.py 的 __version__ / git tag 三处版本一致
+      - name: 版本号漂移检查
+        run: python scripts/version.py check
+
   test:
     name: pytest (py${{ matrix.python-version }})
     needs: lint

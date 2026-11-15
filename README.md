@@ -250,6 +250,7 @@ dev 工具由 `[dependency-groups]` 提供 (pytest), `uv run` 自动同步; ruff
 src/pyzk20r/      库源码
 tests/             单元测试 (FakeDLL 注入) + 真机冒烟
 examples/          可运行示例
+scripts/           版本号工具 (防止 tag 与版本号漂移)
 doc/               厂商 SDK 文档 (不入库)
 ```
 
@@ -265,6 +266,33 @@ sdist 额外含 `tests/` 与 `examples/`(指纹数据 `*.db` 自动排除)。
 
 SDK 文档 (中英文 PDF + 头文件 + MFC Demo) 从 ZKTeco 官网 / "ZKFinger SDK" 安装包获取;
 本库的接口注释即按其 C API 编写。
+
+### 发版流程
+
+版本号共出现在四处: `pyproject.toml` 的 `[project].version`、`src/pyzk20r/__init__.py`
+的 `__version__`、`uv.lock` 的根包版本、git tag。**打 tag 前必须先改版本号**, 否则就是
+版本漂移 (tag 指向的提交里版本号对不上, 发布流水线会直接失败)。
+
+```bash
+# 一条命令: 升版本号 (三处同步) + 提交版本文件 + 打 annotated tag
+python scripts/version.py release 0.1.3
+
+# 推送 (推 tag 即触发 GitHub Actions 发布 PyPI)
+git push origin main && git push origin v0.1.3
+git push gitee main && git push gitee v0.1.3
+```
+
+其它子命令:
+
+```bash
+python scripts/version.py check          # 校验四处一致 (CI 也跑这条)
+python scripts/version.py bump 0.1.3      # 只升版本号, 不提交不打 tag
+python scripts/version.py sync            # 把版本号同步为最新 tag 的版本
+python scripts/version.py tag v0.1.3      # 校验通过后打 tag
+```
+
+CI 的 `version` job 与 `release` 工作流都会执行 `check`: 任何一处版本号对不上,
+流水线直接失败, 不会带着漂移的版本发布到 PyPI。
 
 ## License
 
