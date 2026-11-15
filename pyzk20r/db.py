@@ -33,8 +33,22 @@ __all__ = ["FingerprintDB"]
 #: 登记合并所需模板数 (ZKFPM_DBMerge 固定 3 枚)
 MERGE_COUNT = 3
 
-#: dump()/load() 持久化结构版本号 (v2: user_id 为字符串)
+#: dump()/load() 持久化结构版本号 (v2: user_id 统一字符串; 兼容读取 v1 整数工号)
 _DUMP_VERSION = 2
+_DUMP_VERSIONS = (1, 2)
+
+
+def _norm_user_id(user_id: "str | int") -> str:
+    """工号归一化: 接受 str 或 int (bool 拒绝), 去首尾空白, 统一为 str。
+
+    数字工号 ``52193652`` 与字符串 ``"52193652"`` 是同一工号。
+    """
+    if isinstance(user_id, bool) or not isinstance(user_id, (str, int)):
+        raise TypeError("user_id 必须为 str 或 int, 收到 %s" % type(user_id).__name__)
+    text = str(user_id).strip()
+    if not text:
+        raise ValueError("user_id 不能为空")
+    return text
 
 #: 字符串路径编码 (Windows ANSI, 兼容 XP)
 _PATH_ENCODING = "mbcs"
@@ -87,14 +101,13 @@ class FingerprintDB:
 
     # -- 登记 (一人多指纹) ---------------------------------------------------
 
-    def add(self, user_id: str, template: bytes) -> None:
-        """为 ``user_id`` 添加一枚指纹模板; 同一 user 可多次调用登记多枚。
+    def add(self, user_id: "str | int", template: bytes) -> None:
+        """为 ``user_id`` 添加一枚指纹模板; 同一工号可多次调用登记多枚。
 
-        ``user_id`` 为工号字符串 (如 ``"A00123"``), 必须是 ``str``;
-        内部 fid 与 SDK 的 uint 对应关系由本层维护, 与工号格式无关。
+        ``user_id`` 接受字符串或整数 (``"A00123"`` / ``52193652`` 均可),
+        内部统一按字符串存储; fid 与 SDK uint 的对应关系由本层维护。
         """
-        if not isinstance(user_id, str):
-            raise TypeError("user_id 必须为 str, 收到 %s" % type(user_id).__name__)
+        user_id = _norm_user_id(user_id)
         handle = self._require_open()
         fid = self._next_fid
         buf = ctypes.create_string_buffer(bytes(template), len(template))
@@ -105,8 +118,9 @@ class FingerprintDB:
         self._fid_templates[fid] = bytes(template)
         self._user_fids.setdefault(user_id, []).append(fid)
 
-    def remove(self, user_id: str, template: "bytes | None" = None) -> None:
-        """删除某用户的指纹; 传 ``template`` 只删匹配的那一枚, 否则全删。"""
+    def remove(self, user_id: "str | int", template: "bytes | None" = None) -> None:
+        """删除某工号的指纹; 传 ``template`` 只删匹配的那一枚, 否则全删。"""
+        user_id = _norm_user_id(user_id)
         handle = self._require_open()
         target = bytes(template) if template is not None else None
         for fid in self._user_fids.get(user_id, [])[:]:
@@ -143,8 +157,9 @@ class FingerprintDB:
         """已登记的工号列表 (字典序)。"""
         return sorted(self._user_fids)
 
-    def fingers_of(self, user_id: str) -> "list[bytes]":
-        """某用户已登记的全部模板 (bytes 列表)。"""
+    def fingers_of(self, user_id: "str | int") -> "list[bytes]":
+        """某工号已登记的全部模板 (bytes 列表)。"""
+        user_id = _norm_user_id(user_id)
         return [self._fid_templates[f] for f in self._user_fids.get(user_id, [])]
 
     # -- 持久化契约 (存储介质与时机由应用层决定) -------------------------------
@@ -174,9 +189,9 @@ class FingerprintDB:
         """
         if not isinstance(data, dict):
             raise ValueError("dump 数据必须是 dict")
-        if data.get("version") != _DUMP_VERSION:
+        if data.get("version") not in _DUMP_VERSIONS:
             raise ValueError(
-                "不支持的持久化版本: %r (期望 %d)" % (data.get("version"), _DUMP_VERSION))
+                "不支持的持久化版本: %r (支持 %s)" % (data.get("version"), list(_DUMP_VERSIONS)))
         templates = data.get("templates")
         if not isinstance(templates, list):
             raise ValueError("templates 字段缺失或非列表")
@@ -207,7 +222,7 @@ class FingerprintDB:
         raise_for(ret, "合并登记模板失败")
         return out.raw[:out_len.value]
 
-    def enroll(self, scanner: Scanner, user_id: str, poll_interval: float = 0.1) -> bytes:
+    def enroll(self, scanner: Scanner, user_id: "str | int", poll_interval: float = 0.1) -> bytes:
         """完整登记流程: 用 ``scanner`` 采 3 次 -> 合并 -> 存为 ``user_id`` 的指纹。
 
         返回登记模板。进度回调见 :meth:`pyzk20r.device.Scanner.on_enroll_progress`。
@@ -238,7 +253,7 @@ class FingerprintDB:
             raise MatchError(-20, "识别结果无法映射到用户 (fid=%d)" % fid.value)
         return user_id, score.value
 
-    def verify(self, user_id: str, template: bytes) -> int:
+    def verify(self, user_id: "str | int", template: bytes) -> int:
         """1:1 验证: 对 ``user_id`` 的所有指纹取最优分; 不匹配抛 :class:`MatchError`。
 
         SDK 的 VerifyByID 只区分 ">0=分数 / 其他=失败", 失败可能是真不匹配
@@ -246,6 +261,7 @@ class FingerprintDB:
         """
         handle = self._require_open()
         buf = ctypes.create_string_buffer(bytes(template), len(template))
+        user_id = _norm_user_id(user_id)
         best = 0
         other_err = 0
         for fid in self._user_fids.get(user_id, []):

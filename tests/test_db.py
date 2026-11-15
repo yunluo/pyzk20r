@@ -247,8 +247,37 @@ def test_verify_mixed_error_and_match_returns_score(fake_dll):
         assert db.verify("1001", TPL_A) == 60
 
 
-def test_add_rejects_non_str_user_id(fake_dll):
-    """user_id 必须为字符串 (工号), int 直接 TypeError。"""
+def test_numeric_worker_id_normalized(fake_dll):
+    """数字工号: int 与 str 等价 (52193652 == "52193652"), identify 永远返回 str。"""
+    with FingerprintDB() as db:
+        db.add(52193652, TPL_A)                        # int 形式登记
+        assert db.users == ["52193652"]
+        assert db.fingers_of(52193652) == [TPL_A]      # int 查询命中
+        assert db.fingers_of("52193652") == [TPL_A]    # str 查询命中同一工号
+        fake_dll.db_ident_result = (1, 90)
+        assert db.identify(TPL_A) == ("52193652", 90)  # 识别返回归一化字符串
+        fake_dll.verify_scores = {1: 88}
+        assert db.verify(52193652, TPL_A) == 88        # int 形式 1:1 验证
+        db.remove(52193652)
+        assert db.users == []
+
+
+def test_add_rejects_bool_and_blank(fake_dll):
+    """bool 是 int 子类, 必须显式拒绝; 纯空白工号拒绝。"""
     with FingerprintDB() as db:
         with pytest.raises(TypeError):
-            db.add(1001, TPL_A)
+            db.add(True, TPL_A)
+        with pytest.raises(ValueError):
+            db.add("   ", TPL_A)
+
+
+def test_load_accepts_v1_int_ids(fake_dll):
+    """v1 持久化结构 (整数工号) 仍可读取, 载入后归一化为字符串。"""
+    import base64
+    import json
+    data = {"version": 1,
+            "templates": [[1001, base64.b64encode(TPL_A).decode("ascii")]]}
+    db2 = FingerprintDB.load(json.loads(json.dumps(data)))
+    assert db2.users == ["1001"]
+    assert db2.fingers_of("1001") == [TPL_A]
+    db2.close()
