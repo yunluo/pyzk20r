@@ -15,7 +15,8 @@ jobs:
         with:
           python-version: "3.13"
       - run: uv sync
-      - run: uv run pytest -q
+      # 用 python -m 方式调用 pytest: Windows 上 .exe shim 在部分环境会被当成源码解析
+      - run: uv run python -m pytest -q
 
   build:
     name: 构建并校验版本
@@ -28,7 +29,7 @@ jobs:
           python-version: "3.12"
       - name: 校验 tag 与包版本一致 (vX.Y.Z <-> pyproject version)
         run: |
-          python3 -c "import os, re; tag = os.environ['GITHUB_REF_NAME']; text = open('pyproject.toml', encoding='utf-8').read(); v = re.search(r'(?m)^version = \"(.+)\"', text).group(1); assert v == tag[1:], 'tag %s 与 pyproject version %s 不一致' % (tag, v)"
+          python3 -c "import os, re; tag = os.environ['GITHUB_REF_NAME']; text = open('pyproject.toml', encoding='utf-8').read(); v = re.search(r'(?m)^version = \"(.+)\"', text).group(1); assert v == tag[1:], 'tag {} 与 pyproject version {} 不一致'.format(tag, v)"
       - name: 构建 wheel + sdist
         run: uv build
       - uses: actions/upload-artifact@v4
