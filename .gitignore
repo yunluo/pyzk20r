@@ -99,7 +99,7 @@ ipython_config.py
 #   Similar to Pipfile.lock, it is generally recommended to include uv.lock in version control.
 #   This is especially recommended for binary packages to ensure reproducibility, and is more
 #   commonly ignored for libraries.
-# uv.lock
+uv.lock
 
 # poetry
 #   Similar to Pipfile.lock, it is generally recommended to include poetry.lock in version control.
@@ -188,7 +188,14 @@ cython_debug/
 #   be found at https://github.com/github/gitignore/blob/main/Global/JetBrains.gitignore
 #   and can be added to the global gitignore or merged into this file.  For a more nuclear
 #   option (not recommended) you can uncomment the following to ignore the entire idea folder.
-# .idea/
+.idea/
+
+# 厂商 SDK 原始文档与二进制 (PDF/头文件/MFC Demo), 不随库分发
+doc/
+
+# 真机测试产生的生物特征数据, 严禁入库
+examples/real_capture.bmp
+examples/real_template.bin
 
 # Abstra
 #   Abstra is an AI-powered process automation framework.
