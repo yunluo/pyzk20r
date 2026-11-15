@@ -106,7 +106,7 @@ class TestSyntaxGuards(unittest.TestCase):
                     "{} 仍使用 % 格式化, 请改用 .format(): {}".format(path, value),
                 )
 
-    @unittest.skipIf(sys.version_info < (3, 8), "ast feature_version 需 Python 3.8+")
+    @unittest.skipIf(sys.version_info < (3, 8), "ast feature_version requires Python 3.8+")
     def test_sources_parse_as_py34(self):
         """feature_version=(3,4) 拒绝 3.5+ 语法 (f-string/变量标注/async/海象运算符 等)。
 
@@ -120,9 +120,7 @@ class TestSyntaxGuards(unittest.TestCase):
         for path, source in _package_sources():
             if "from typing import" not in source:
                 continue
-            self.assertIn(
-                "except ImportError", source, "{} 的 typing 导入未做兜底处理".format(path)
-            )
+            self.assertIn("except ImportError", source, "{} 的 typing 导入未做兜底处理".format(path))
             self.assertIn("pip install typing", source, "{} 缺少 typing 安装提示".format(path))
 
     def test_sources_use_inline_annotations(self):

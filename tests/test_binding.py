@@ -36,16 +36,14 @@ class TestResolveDllPath(unittest.TestCase):
         """驱动装好的机器上返回 System32 绝对路径 (防裸名劫持); 否则裸名交给系统搜索。"""
         path = _binding.resolve_dll_path()
         self.assertTrue(path.endswith("libzkfp.dll"))
-        system32 = os.path.join(
-            os.environ.get("SystemRoot", r"C:\Windows"), "System32", "libzkfp.dll"
-        )
+        system32 = os.path.join(os.environ.get("SystemRoot", r"C:\Windows"), "System32", "libzkfp.dll")
         if os.path.exists(system32):
             self.assertEqual(path, system32)  # 绝对路径, 不用裸名
         else:
             self.assertEqual(path, "libzkfp.dll")
 
 
-@unittest.skipIf(not _WIN, "仅 Windows")
+@unittest.skipIf(not _WIN, "Windows only")
 class TestLoadRealDll(unittest.TestCase):
     """加载真 DLL (只声明原型, 不调 Init), 验证加载器与原型绑定。"""
 
@@ -53,7 +51,7 @@ class TestLoadRealDll(unittest.TestCase):
         try:
             dll = _binding.load_dll()
         except OSError as e:
-            raise unittest.SkipTest("libzkfp.dll 不可用 (未装驱动): {}".format(e))
+            raise unittest.SkipTest("libzkfp.dll unavailable (driver not installed): {}".format(e))
         for name in (
             "ZKFPM_Init",
             "ZKFPM_OpenDevice",

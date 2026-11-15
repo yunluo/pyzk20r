@@ -61,7 +61,7 @@ def read_text(path):
         with open(str(path), "rb") as f:  # open 而非 Path.read_bytes: 兼容 3.4 的 pathlib
             raw = f.read()
     except OSError as exc:
-        raise VersionError("读取 {} 失败: {}".format(path, exc))
+        raise VersionError("failed to read {}: {}".format(path, exc))
     text = raw.decode("utf-8")
     return text, ("\r\n" if "\r\n" in text else "\n")
 
@@ -78,7 +78,7 @@ def section_span(text, name):
     """返回 [name] 段在文本中的 (起始, 结束) 偏移, 不含段头本身。"""
     m = re.search(r"(?m)^\[" + re.escape(name) + r"\][ \t\r]*$", text)
     if not m:
-        raise VersionError("pyproject.toml 中找不到 [{}] 段".format(name))
+        raise VersionError("[{}] section not found in pyproject.toml".format(name))
     start = m.end()
     nxt = re.search(r"(?m)^\[", text[start:])
     end = start + nxt.start() if nxt else len(text)
@@ -97,7 +97,7 @@ def read_pyproject_version(text=None):
     start, end = section_span(text, "project")
     m = re.search(r'(?m)^version[ \t]*=[ \t]*"([^"]+)"', text[start:end])
     if not m:
-        raise VersionError("pyproject.toml 的 [project] 段缺少 version 字段")
+        raise VersionError("[project] section missing 'version' field in pyproject.toml")
     return m.group(1)
 
 
@@ -106,7 +106,7 @@ def write_pyproject_version(text, version):
     start, end = section_span(text, "project")
     m = re.search(r'(?m)^version[ \t]*=[ \t]*"[^"]+"', text[start:end])
     if not m:
-        raise VersionError("pyproject.toml 的 [project] 段缺少 version 字段")
+        raise VersionError("[project] section missing 'version' field in pyproject.toml")
     head, body, tail = text[:start], text[start:end], text[end:]
     return head + body[: m.start()] + 'version = "{}"'.format(version) + body[m.end() :] + tail
 
@@ -117,7 +117,7 @@ def read_init_version(text=None):
         text, _ = read_text(INIT_PY)
     m = re.search(r'(?m)^__version__[ \t]*=[ \t]*"([^"]+)"', text)
     if not m:
-        raise VersionError("{} 中找不到 __version__".format(INIT_PY))
+        raise VersionError("__version__ not found in {}".format(INIT_PY))
     return m.group(1)
 
 
@@ -125,7 +125,7 @@ def write_init_version(text, version):
     """把 __init__.py 的 __version__ 改成指定值, 返回新文本。"""
     m = re.search(r'(?m)^__version__[ \t]*=[ \t]*"[^"]+"', text)
     if not m:
-        raise VersionError("{} 中找不到 __version__".format(INIT_PY))
+        raise VersionError("__version__ not found in {}".format(INIT_PY))
     return text[: m.start()] + '__version__ = "{}"'.format(version) + text[m.end() :]
 
 
@@ -139,7 +139,7 @@ def lock_package_span(text, name):
         nm = re.search(r'(?m)^name[ \t]*=[ \t]*"([^"]+)"', block)
         if nm and nm.group(1) == name:
             return start, end
-    raise VersionError("uv.lock 中找不到包 {}".format(name))
+    raise VersionError("package {} not found in uv.lock".format(name))
 
 
 def read_lock_version(text=None):
@@ -149,7 +149,7 @@ def read_lock_version(text=None):
     start, end = lock_package_span(text, PACKAGE_NAME)
     m = re.search(r'(?m)^version[ \t]*=[ \t]*"([^"]+)"', text[start:end])
     if not m:
-        raise VersionError("uv.lock 中 {} 包缺少 version 字段".format(PACKAGE_NAME))
+        raise VersionError("package {} missing 'version' field in uv.lock".format(PACKAGE_NAME))
     return m.group(1)
 
 
@@ -158,7 +158,7 @@ def write_lock_version(text, version):
     start, end = lock_package_span(text, PACKAGE_NAME)
     m = re.search(r'(?m)^version[ \t]*=[ \t]*"[^"]+"', text[start:end])
     if not m:
-        raise VersionError("uv.lock 中 {} 包缺少 version 字段".format(PACKAGE_NAME))
+        raise VersionError("package {} missing 'version' field in uv.lock".format(PACKAGE_NAME))
     head, body, tail = text[:start], text[start:end], text[end:]
     return head + body[: m.start()] + 'version = "{}"'.format(version) + body[m.end() :] + tail
 
@@ -180,7 +180,7 @@ def git(*args):
         errors="replace",
     )
     if proc.returncode != 0:
-        raise VersionError("git {} 失败: {}".format(" ".join(args), (proc.stderr or "").strip()))
+        raise VersionError("git {} failed: {}".format(" ".join(args), (proc.stderr or "").strip()))
     return proc.stdout
 
 
@@ -243,12 +243,12 @@ def do_check(only_tag=None):
 
     version = current_version()
     if not VERSION_RE.match(version):
-        problems.append("pyproject.toml 的版本号 {!r} 不是 X.Y.Z 格式".format(version))
+        problems.append("pyproject.toml version {!r} is not in X.Y.Z format".format(version))
 
     init_version = read_init_version()
     if init_version != version:
         problems.append(
-            "src/pyzk20r/__init__.py 的 __version__ = {} 与 pyproject.toml 的 {} 不一致".format(
+            "__version__ = {} in src/pyzk20r/__init__.py does not match pyproject.toml version {}".format(
                 init_version, version
             )
         )
@@ -257,46 +257,44 @@ def do_check(only_tag=None):
         lock_version = read_lock_version()
         if lock_version != version:
             problems.append(
-                "uv.lock 里 {} 包的版本 {} 与 pyproject.toml 的 {} 不一致 (需重新 lock)".format(
+                "package {} version {} in uv.lock does not match pyproject.toml version {} (re-lock needed)".format(
                     PACKAGE_NAME, lock_version, version
                 )
             )
     else:
-        print("[提示] 未找到 uv.lock, 跳过锁文件校验")
+        print("[INFO] uv.lock not found, skipping lockfile check")
 
     tags = list_tags()
     for tag in tags:
         tagged_version = version_at_ref(tag)
         if tagged_version is None:
-            problems.append("tag {} 指向的提交里没有可解析的 pyproject.toml".format(tag))
+            problems.append("tag {} points to a commit without a parseable pyproject.toml".format(tag))
         elif tagged_version != tag[1:]:
             problems.append(
-                "tag {} 指向的提交里 pyproject.toml 版本为 {} —— 版本漂移".format(
-                    tag, tagged_version
-                )
+                "tag {} points to a commit with pyproject.toml version {} -- version drift".format(tag, tagged_version)
             )
 
     if tags:
         latest = tags[-1]
         if version_key(version) < version_key(latest[1:]):
             problems.append(
-                "pyproject.toml 版本 {} 低于已打 tag 的最高版本 {} —— 版本漂移".format(
+                "pyproject.toml version {} is lower than the highest tagged version {} -- version drift".format(
                     version, latest
                 )
             )
 
     if only_tag:
         if only_tag not in tags:
-            problems.append("指定的 tag {} 不存在".format(only_tag))
+            problems.append("specified tag {} does not exist".format(only_tag))
 
     if problems:
-        print("[失败] 发现 {} 处版本漂移:".format(len(problems)))
+        print("[FAIL] found {} version drift issues:".format(len(problems)))
         for item in problems:
             print("  - {}".format(item))
         return problems
 
     print(
-        "[通过] 版本一致: pyproject.toml / __init__.py / uv.lock = {}; 已校验 {} 个 tag".format(
+        "[OK] versions consistent: pyproject.toml / __init__.py / uv.lock = {}; {} tags verified".format(
             version, len(tags)
         )
     )
@@ -306,11 +304,11 @@ def do_check(only_tag=None):
 def do_bump(target, force=False):
     """把三处版本号同步改成 target。"""
     if not VERSION_RE.match(target):
-        raise VersionError("版本号 {!r} 不合法, 应为 X.Y.Z 格式".format(target))
+        raise VersionError("invalid version {!r}, expected X.Y.Z format".format(target))
 
     current = current_version()
     if not force and version_key(target) < version_key(current):
-        raise VersionError("不允许降级: 当前 {} -> 目标 {}".format(current, target))
+        raise VersionError("downgrade not allowed: current {} -> target {}".format(current, target))
 
     changed = []
 
@@ -331,9 +329,9 @@ def do_bump(target, force=False):
             changed.append("uv.lock")
 
     if changed:
-        print("[完成] 版本号 {} -> {}: {}".format(current, target, ", ".join(changed)))
+        print("[OK] version {} -> {}: {}".format(current, target, ", ".join(changed)))
     else:
-        print("[完成] 版本号已是 {}".format(target))
+        print("[OK] version is already {}".format(target))
     return changed
 
 
@@ -341,7 +339,7 @@ def do_sync():
     """把三处版本号同步为最新 tag 的版本。"""
     tags = list_tags()
     if not tags:
-        raise VersionError("仓库里还没有 vX.Y.Z 形式的 tag, 无法同步")
+        raise VersionError("no vX.Y.Z tags in repository, nothing to sync")
     return do_bump(tags[-1][1:], force=True)
 
 
@@ -349,33 +347,29 @@ def do_tag(target=None, message=None):
     """校验通过后创建 annotated tag。"""
     version = target if target else current_version()
     if not target and not VERSION_RE.match(version):
-        raise VersionError("当前版本号 {!r} 不合法, 请显式给出 X.Y.Z".format(version))
+        raise VersionError("current version {!r} is invalid, pass X.Y.Z explicitly".format(version))
 
     if current_version() != version:
         raise VersionError(
-            "pyproject.toml 版本是 {}, 与目标 {} 不一致, 请先跑 bump".format(
-                current_version(), version
-            )
+            "pyproject.toml version is {}, does not match target {}, run bump first".format(current_version(), version)
         )
     if read_init_version() != version:
-        raise VersionError(
-            "src/pyzk20r/__init__.py 的 __version__ 与 {} 不一致, 请先跑 bump".format(version)
-        )
+        raise VersionError("__version__ in src/pyzk20r/__init__.py does not match {}, run bump first".format(version))
     if UV_LOCK.exists() and read_lock_version() != version:
         raise VersionError(
-            "uv.lock 里 {} 包的版本与 {} 不一致, 请先跑 bump".format(PACKAGE_NAME, version)
+            "package {} version in uv.lock does not match {}, run bump first".format(PACKAGE_NAME, version)
         )
 
     dirty = git("status", "--porcelain", "--", *version_files())
     if dirty.strip():
-        raise VersionError("版本文件还有未提交的改动, 先提交再打 tag:\n{}".format(dirty.strip()))
+        raise VersionError("version files have uncommitted changes, commit before tagging:\n{}".format(dirty.strip()))
 
     tag = "v{}".format(version)
     if tag in list_tags():
-        raise VersionError("tag {} 已存在, 不要重复打 tag".format(tag))
+        raise VersionError("tag {} already exists, refusing to re-tag".format(tag))
 
     git("tag", "-a", tag, "-m", message or "release: {}".format(tag))
-    print("[完成] 已创建 annotated tag {}".format(tag))
+    print("[OK] created annotated tag {}".format(tag))
     return tag
 
 
@@ -395,7 +389,7 @@ def do_release(version, message=None):
     git("commit", "-m", "release: v{} (版本号同步 {})".format(version, version))
     tag = do_tag(version, message)
     print("")
-    print("接下来推送 (tag 推送即触发 PyPI 发布):")
+    print("Next, push (pushing the tag triggers the PyPI release):")
     print("  git push origin main && git push origin {}".format(tag))
     print("  git push gitee main && git push gitee {}".format(tag))
     return tag
@@ -463,7 +457,7 @@ def main(argv=None):
             do_release(args.version, args.message)
             return 0
     except VersionError as exc:
-        print("[错误] {}".format(exc))
+        print("[ERROR] {}".format(exc))
         return 1
 
     parser.print_help()

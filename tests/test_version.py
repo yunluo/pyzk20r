@@ -67,11 +67,7 @@ def _write_sources(root, version):
     with open(os.path.join(pkg, "__init__.py"), "w", encoding="utf-8", newline="\n") as f:
         f.write('__version__ = "{}"\n'.format(version))
     with open(os.path.join(root, "uv.lock"), "w", encoding="utf-8", newline="\n") as f:
-        f.write(
-            '[[package]]\nname = "pyzk20r"\nversion = "{}"\nsource = {{ editable = "." }}\n'.format(
-                version
-            )
-        )
+        f.write('[[package]]\nname = "pyzk20r"\nversion = "{}"\nsource = {{ editable = "." }}\n'.format(version))
 
 
 def _run_check(root):
@@ -101,15 +97,15 @@ class TestRepoVersionConsistency(unittest.TestCase):
         if version_tool.UV_LOCK.exists():
             self.assertEqual(version_tool.read_lock_version(), pyproject_version)
 
-    @unittest.skipUnless(_HAS_SUBPROCESS_RUN, "version.py 需要 subprocess.run (3.5+)")
+    @unittest.skipUnless(_HAS_SUBPROCESS_RUN, "version.py requires subprocess.run (3.5+)")
     def test_check_command_passes(self):
         """check 子命令在本仓库必须通过 (CI 的 version job 跑的就是这条)。"""
         code, out = _output([sys.executable, SCRIPT, "check"], cwd=REPO_DIR)
         self.assertEqual(code, 0, out)
 
 
-@unittest.skipUnless(shutil.which("git"), "需要 git 才能测试 tag 漂移检测")
-@unittest.skipUnless(_HAS_SUBPROCESS_RUN, "version.py 需要 subprocess.run (3.5+)")
+@unittest.skipUnless(shutil.which("git"), "git required for tag drift detection tests")
+@unittest.skipUnless(_HAS_SUBPROCESS_RUN, "version.py requires subprocess.run (3.5+)")
 class TestDriftDetection(unittest.TestCase):
     """在临时 git 仓库里构造漂移, 验证 check/bump 真的能拦下。"""
 
@@ -133,7 +129,7 @@ class TestDriftDetection(unittest.TestCase):
         _git(self.root, "tag", "-a", "v0.9.1", "-m", "v0.9.1")
         code, out = _run_check(self.root)
         self.assertEqual(code, 1)
-        self.assertIn("版本漂移", out)
+        self.assertIn("version drift", out)
 
     def test_check_detects_init_mismatch(self):
         """__init__.py 的 __version__ 落后 -> 必须报错。"""
@@ -152,9 +148,7 @@ class TestDriftDetection(unittest.TestCase):
     def test_check_detects_lock_mismatch(self):
         """uv.lock 里的版本落后 -> 必须报错。"""
         with open(os.path.join(self.root, "uv.lock"), "w", encoding="utf-8", newline="\n") as f:
-            f.write(
-                '[[package]]\nname = "pyzk20r"\nversion = "0.8.0"\nsource = {{ editable = "." }}\n'
-            )
+            f.write('[[package]]\nname = "pyzk20r"\nversion = "0.8.0"\nsource = {{ editable = "." }}\n')
         code, out = _run_check(self.root)
         self.assertEqual(code, 1)
         self.assertIn("uv.lock", out)
@@ -164,7 +158,7 @@ class TestDriftDetection(unittest.TestCase):
         _write_sources(self.root, "0.8.0")
         code, out = _run_check(self.root)
         self.assertEqual(code, 1)
-        self.assertIn("版本漂移", out)
+        self.assertIn("version drift", out)
 
     def test_bump_syncs_all_sources(self):
         """bump 要同时改 pyproject / __init__ / uv.lock 三处。"""
@@ -180,7 +174,7 @@ class TestDriftDetection(unittest.TestCase):
     def test_bump_refuses_downgrade(self):
         code, out = _run_tool(self.root, "bump", "0.8.0")
         self.assertEqual(code, 1)
-        self.assertIn("不允许降级", out)
+        self.assertIn("downgrade not allowed", out)
 
 
 if __name__ == "__main__":

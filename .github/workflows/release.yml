@@ -7,7 +7,7 @@ on:
 
 jobs:
   test:
-    name: 发布前测试 (Windows)
+    name: test (Windows)
     runs-on: windows-latest
     steps:
       - uses: actions/checkout@v4
@@ -20,7 +20,7 @@ jobs:
           PYTHONIOENCODING: utf-8    # Windows runner 默认 cp1252, 中文输出会崩
 
   build:
-    name: 构建并校验版本
+    name: build & verify version
     needs: test
     runs-on: ubuntu-latest
     steps:
@@ -34,9 +34,9 @@ jobs:
         with:
           python-version: "3.12"
       # 校验 tag 与包版本一致 (vX.Y.Z <-> pyproject version / __version__), 有漂移直接失败
-      - name: 校验 tag 与包版本一致
+      - name: verify tag matches package version
         run: python scripts/version.py check --tag "${GITHUB_REF_NAME}"
-      - name: 构建 wheel + sdist
+      - name: build wheel + sdist
         run: uv build
       - uses: actions/upload-artifact@v4
         with:
@@ -44,7 +44,7 @@ jobs:
           path: dist/
 
   publish:
-    name: 发布 PyPI
+    name: publish to PyPI
     needs: build
     runs-on: ubuntu-latest
     environment: pypi
@@ -62,13 +62,13 @@ jobs:
       #   2) 或用 Trusted Publishing: pypi.org 项目页配置 publisher
       #      owner=yunluo repo=pyzk20r workflow=release.yml environment=pypi
       #      (仓库名没有下划线, 填错会报 "no publisher found")
-      - name: 发布 PyPI (API Token)
+      - name: publish (API token)
         if: env.PYPI_API_TOKEN != ''
         uses: pypa/gh-action-pypi-publish@release/v1
         with:
           password: ${{ secrets.PYPI_API_TOKEN }}
           packages-dir: dist/
-      - name: 发布 PyPI (Trusted Publishing)
+      - name: publish (Trusted Publishing)
         if: env.PYPI_API_TOKEN == ''
         uses: pypa/gh-action-pypi-publish@release/v1
         with:

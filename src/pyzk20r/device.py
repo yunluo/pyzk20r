@@ -37,7 +37,7 @@ from .exceptions import (
 try:
     from typing import Generator, List, Optional, Tuple
 except ImportError:  # pragma: no cover -- 精简环境缺 typing 时的提示
-    raise ImportError("缺少 typing 模块, 请安装: pip install typing")
+    raise ImportError("typing module not found, please install: pip install typing")
 
 __all__ = ["DeviceInfo", "Frame", "Scanner"]
 
@@ -84,18 +84,14 @@ class Frame:
         """图像转 8 位灰度 BMP 字节流 (纯 stdlib, 无 PIL 依赖)。"""
         if len(self.image) < self.width * self.height:
             raise ValueError(
-                "image 数据不足: {:d} 字节 < {:d}x{:d}".format(
-                    len(self.image), self.width, self.height
-                )
+                "image data too short: {:d} bytes < {:d}x{:d}".format(len(self.image), self.width, self.height)
             )
         row_size = self.width + (4 - self.width % 4) % 4
         body_size = row_size * self.height
         palette = b"".join(struct.pack("BBBB", i, i, i, 0) for i in range(256))
         offset = 14 + 40 + len(palette)
         header = struct.pack("<2sIHHI", b"BM", offset + body_size, 0, 0, offset)
-        info = struct.pack(
-            "<IiiHHIIiiII", 40, self.width, self.height, 1, 8, 0, body_size, 0, 0, 0, 0
-        )
+        info = struct.pack("<IiiHHIIiiII", 40, self.width, self.height, 1, 8, 0, body_size, 0, 0, 0, 0)
         parts = [header, info, palette]
         for y in range(self.height - 1, -1, -1):  # BMP 自底向上
             start = y * self.width
@@ -130,15 +126,15 @@ class Scanner:
     def open(self) -> None:
         """打开设备 (先确保 SDK 初始化)。"""
         if self._handle is not None:
-            raise ZKFPMError(ZKFPErr.ALREADY_OPENED, "设备已打开")
+            raise ZKFPMError(ZKFPErr.ALREADY_OPENED, "device already open")
         dll = _binding.lib_addref(self._dll_path)
         if dll.ZKFPM_GetDeviceCount() < 1:
             _binding.lib_release()
-            raise DeviceNotFoundError(ZKFPErr.NO_DEVICE, "无设备连接")
+            raise DeviceNotFoundError(ZKFPErr.NO_DEVICE, "no device connected")
         handle = dll.ZKFPM_OpenDevice(self._index)
         if not handle:
             _binding.lib_release()
-            raise DeviceNotFoundError(ZKFPErr.OPEN, "打开设备失败 (index={:d})".format(self._index))
+            raise DeviceNotFoundError(ZKFPErr.OPEN, "failed to open device (index={:d})".format(self._index))
         self._handle = handle
 
     def close(self) -> None:
@@ -148,7 +144,7 @@ class Scanner:
         ret = _binding.get_dll(self._dll_path).ZKFPM_CloseDevice(self._handle)
         self._handle = None
         _binding.lib_release()
-        raise_for(ret, "关闭设备失败")
+        raise_for(ret, "failed to close device")
 
     @property
     def closed(self) -> bool:
@@ -162,7 +158,7 @@ class Scanner:
 
     def _require_open(self) -> int:
         if self._handle is None:
-            raise ZKFPMError(ZKFPErr.NOT_OPENED, "设备未打开")
+            raise ZKFPMError(ZKFPErr.NOT_OPENED, "device not open")
         return self._handle
 
     def __repr__(self) -> str:
@@ -176,7 +172,7 @@ class Scanner:
         buf = ctypes.create_string_buffer(size)
         n = ctypes.c_uint(size)
         ret = _binding.get_dll().ZKFPM_GetParameters(handle, int(code), buf, ctypes.byref(n))
-        raise_for(ret, "读取参数 {:d} 失败".format(code), DeviceError)
+        raise_for(ret, "failed to get parameter {:d}".format(code), DeviceError)
         return buf.raw[: n.value]
 
     def get_param_int(self, code: int) -> int:
@@ -188,7 +184,7 @@ class Scanner:
         handle = self._require_open()
         buf = ctypes.create_string_buffer(struct.pack("<i", int(value)), 4)
         ret = _binding.get_dll().ZKFPM_SetParameters(handle, int(code), buf, 4)
-        raise_for(ret, "设置参数 {:d} 失败".format(code), DeviceError)
+        raise_for(ret, "failed to set parameter {:d}".format(code), DeviceError)
 
     def get_param_str(self, code: int) -> str:
         """读取字符串型参数 (厂商/产品名/序列号)。忽略不可解码字节 (Windows ANSI)。"""
@@ -236,7 +232,7 @@ class Scanner:
     def template_format(self, value: str) -> None:
         fmt = {"ansi": 0, "iso": 1}.get(value)
         if fmt is None:
-            raise ValueError("template_format 只支持 'ansi' / 'iso'")
+            raise ValueError("template_format only supports 'ansi' / 'iso'")
         self.set_param_int(Param.TEMPLATE_FORMAT, fmt)
 
     def led(self, color: str, on: bool = True) -> None:
@@ -244,7 +240,7 @@ class Scanner:
         try:
             code = _LED_CODES[color]
         except KeyError:
-            raise ValueError("color 只支持 'white' / 'green' / 'red'")
+            raise ValueError("color only supports 'white' / 'green' / 'red'")
         self.set_param_int(code, 1 if on else 0)
 
     def info(self) -> DeviceInfo:
@@ -274,9 +270,7 @@ class Scanner:
         """返回 (width, height, dpi)。"""
         handle = self._require_open()
         w, h, dpi = ctypes.c_int(), ctypes.c_int(), ctypes.c_int()
-        ret = _binding.get_dll().ZKFPM_GetCaptureParamsEx(
-            handle, ctypes.byref(w), ctypes.byref(h), ctypes.byref(dpi)
-        )
+        ret = _binding.get_dll().ZKFPM_GetCaptureParamsEx(handle, ctypes.byref(w), ctypes.byref(h), ctypes.byref(dpi))
         raise_for(ret, "获取采集参数失败", DeviceError)
         return w.value, h.value, dpi.value
 
@@ -303,7 +297,7 @@ class Scanner:
             return Frame(img_buf.raw, tpl_buf.raw[: tpl_len.value], width, height, dpi)
         if int(ret) in _TRANSIENT_CAPTURE_CODES:
             return None
-        raise error_class(int(ret))(int(ret), "采集失败")
+        raise error_class(int(ret))(int(ret), "capture failed")
 
     def acquire(self, poll_interval: float = 0.1, timeout: Optional[float] = None) -> Frame:
         """阻塞等待手指并采集一次。
@@ -318,7 +312,7 @@ class Scanner:
             if frame is not None:
                 return frame
             if deadline is not None and time.monotonic() >= deadline:
-                raise CaptureError(int(ZKFPErr.CAPTURE), "取像超时 ({} 秒)".format(timeout))
+                raise CaptureError(int(ZKFPErr.CAPTURE), "capture timeout ({}s)".format(timeout))
             if poll_interval > 0:
                 time.sleep(poll_interval)
 

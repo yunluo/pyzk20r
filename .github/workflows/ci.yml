@@ -19,15 +19,15 @@ jobs:
       # 版本锁定在本地验证过的区间, 避免格式化规则随版本漂移导致误报
       - name: ruff lint
         run: uvx "ruff>=0.17,<0.18" check .
-      - name: ruff format 检查
+      - name: ruff format check
         run: uvx "ruff>=0.17,<0.18" format --check .
-      - name: ty 类型检查
+      - name: ty type check
         run: uvx ty check
-      - name: 构建产物校验
+      - name: build artifacts
         run: uv build
 
   version:
-    name: 版本一致性检查
+    name: version consistency
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -37,7 +37,7 @@ jobs:
         with:
           python-version: "3.12"
       # 校验 pyproject.toml / __init__.py 的 __version__ / git tag 三处版本一致
-      - name: 版本号漂移检查
+      - name: version drift check
         run: python scripts/version.py check
 
   test:
@@ -53,15 +53,15 @@ jobs:
       - uses: astral-sh/setup-uv@v5
         with:
           python-version: ${{ matrix.python-version }}
-      - name: 同步依赖 (项目本体)
+      - name: sync deps (project itself)
         run: uv sync
-      - name: 测试 (mock 全量 + 真机冒烟自动跳过)
+      - name: tests (mock suite + real-device smoke, auto-skip)
         env:
           PYTHONIOENCODING: utf-8    # Windows runner 默认 cp1252, 中文输出会崩
         run: uv run python -m unittest discover -s tests -v
 
   test-py37:
-    name: unittest (py3.7, CI 可验证下限)
+    name: unittest (py3.7, lowest CI-verifiable)
     needs: lint
     runs-on: windows-latest
     steps:
@@ -72,7 +72,7 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: "3.7"
-      - name: 测试 (mock 全量 + 真机冒烟自动跳过)
+      - name: tests (mock suite + real-device smoke, auto-skip)
         env:
           PYTHONIOENCODING: utf-8    # Windows runner 默认 cp1252, 中文输出会崩
         run: python -m unittest discover -s tests -v

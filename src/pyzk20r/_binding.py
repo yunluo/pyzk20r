@@ -20,7 +20,7 @@ from .exceptions import ZKFPMError
 try:
     from typing import Optional
 except ImportError:  # pragma: no cover -- 精简环境缺 typing 时的提示
-    raise ImportError("缺少 typing 模块, 请安装: pip install typing")
+    raise ImportError("typing module not found, please install: pip install typing")
 
 __all__ = [
     "ZKFPErr",
@@ -130,9 +130,9 @@ def resolve_dll_path(explicit: Optional[str] = None) -> str:
 
 def load_dll(path: Optional[str] = None) -> ctypes.WinDLL:
     """加载 libzkfp.dll 并声明全部函数原型 (stdcall)。"""
-    dll = ctypes.WinDLL(resolve_dll_path(path))
-    _set_prototypes(dll)
-    return dll
+    dll_ = ctypes.WinDLL(resolve_dll_path(path))
+    _set_prototypes(dll_)
+    return dll_
 
 
 #: 惰性加载的 DLL 单例; 测试可注入伪造对象
@@ -151,7 +151,7 @@ def get_dll(path: Optional[str] = None) -> ctypes.WinDLL:
     return dll
 
 
-def _set_prototypes(dll: ctypes.WinDLL) -> None:
+def _set_prototypes(dll_: ctypes.WinDLL) -> None:
     """声明本库使用的 SDK 函数原型。仅绑定现行 DB* 接口, 旧别名不绑定。"""
     c_int = ctypes.c_int
     c_uint = ctypes.c_uint
@@ -190,7 +190,7 @@ def _set_prototypes(dll: ctypes.WinDLL) -> None:
         "ZKFPM_GetTemplateQuality": ([c_void_p, c_char_p, c_int], c_int),
     }
     for name, (argtypes, restype) in protos.items():
-        fn = getattr(dll, name)
+        fn = getattr(dll_, name)
         fn.argtypes = argtypes
         fn.restype = restype
 
@@ -210,7 +210,7 @@ def lib_addref(path: Optional[str] = None) -> ctypes.WinDLL:
     if _init_refs == 0:
         ret = d.ZKFPM_Init()
         if ret not in (ZKFPErr.OK, ZKFPErr.ALREADY_INIT):
-            raise ZKFPMError(int(ret), "ZKFPM_Init 失败")
+            raise ZKFPMError(int(ret), "ZKFPM_Init failed")
     _init_refs += 1
     return d
 

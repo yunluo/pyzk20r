@@ -13,7 +13,7 @@ import support  # noqa: F401  (引导 src 到 sys.path)
 from pyzk20r import _binding
 
 
-@unittest.skipUnless(sys.platform == "win32", "仅 Windows")
+@unittest.skipUnless(sys.platform == "win32", "Windows only")
 class TestRealDeviceSmoke(unittest.TestCase):
     """连接真机时验证底层链路; 无驱动/无设备自动 skip。"""
 
@@ -21,28 +21,26 @@ class TestRealDeviceSmoke(unittest.TestCase):
         try:
             dll = _binding.load_dll()
         except OSError as e:
-            raise unittest.SkipTest("libzkfp.dll 不可用 (未装驱动): {}".format(e))
+            raise unittest.SkipTest("libzkfp.dll unavailable (driver not installed): {}".format(e))
         ret = dll.ZKFPM_Init()
         if ret not in (0, 1):
-            raise unittest.SkipTest("ZKFPM_Init 失败 ({:d})".format(ret))
+            raise unittest.SkipTest("ZKFPM_Init failed ({:d})".format(ret))
         try:
             if dll.ZKFPM_GetDeviceCount() < 1:
-                raise unittest.SkipTest("未连接 Live20R 设备")
+                raise unittest.SkipTest("no Live20R device connected")
             handle = dll.ZKFPM_OpenDevice(0)
-            self.assertTrue(handle, "打开设备失败")
+            self.assertTrue(handle, "failed to open device")
             try:
                 w, h, dpi = ctypes.c_int(), ctypes.c_int(), ctypes.c_int()
-                ret = dll.ZKFPM_GetCaptureParamsEx(
-                    handle, ctypes.byref(w), ctypes.byref(h), ctypes.byref(dpi)
-                )
-                self.assertEqual(ret, 0, "获取采集参数失败 ({:d})".format(ret))
+                ret = dll.ZKFPM_GetCaptureParamsEx(handle, ctypes.byref(w), ctypes.byref(h), ctypes.byref(dpi))
+                self.assertEqual(ret, 0, "failed to get capture params ({:d})".format(ret))
                 self.assertTrue(
                     w.value > 0 and h.value > 0,
-                    "图像尺寸异常: {:d}x{:d}".format(w.value, h.value),
+                    "abnormal image size: {:d}x{:d}".format(w.value, h.value),
                 )
                 # 部分 SLK20R 固件 dpi 读数为 0, 只在非 0 时校验范围
                 if dpi.value:
-                    self.assertTrue(300 <= dpi.value <= 1500, "DPI 异常: {:d}".format(dpi.value))
+                    self.assertTrue(300 <= dpi.value <= 1500, "abnormal DPI: {:d}".format(dpi.value))
             finally:
                 self.assertEqual(dll.ZKFPM_CloseDevice(handle), 0)
         finally:

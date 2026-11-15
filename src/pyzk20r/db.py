@@ -32,7 +32,7 @@ from .exceptions import LibraryError, MatchError, MergeError, error_class, raise
 try:
     from typing import List, Optional, Tuple, Union
 except ImportError:  # pragma: no cover -- 精简环境缺 typing 时的提示
-    raise ImportError("缺少 typing 模块, 请安装: pip install typing")
+    raise ImportError("typing module not found, please install: pip install typing")
 
 __all__ = ["FingerprintDB"]
 
@@ -53,10 +53,10 @@ def _norm_user_id(user_id: Union[str, int]) -> str:
     数字工号 ``52193652`` 与字符串 ``"52193652"`` 是同一工号。
     """
     if isinstance(user_id, bool) or not isinstance(user_id, (str, int)):
-        raise TypeError("user_id 必须为 str 或 int, 收到 {}".format(type(user_id).__name__))
+        raise TypeError("user_id must be str or int, got {}".format(type(user_id).__name__))
     text = str(user_id).strip()
     if not text:
-        raise ValueError("user_id 不能为空")
+        raise ValueError("user_id must not be empty")
     return text
 
 
@@ -72,7 +72,7 @@ class FingerprintDB:
         handle = _binding.lib_addref(dll_path).ZKFPM_DBInit()
         if not handle:
             _binding.lib_release()
-            raise LibraryError(-1, "创建算法库失败")
+            raise LibraryError(-1, "failed to create algorithm database")
         self._handle = handle
         self._next_fid = 1
         self._fid_to_user = {}  # type: dict
@@ -98,13 +98,11 @@ class FingerprintDB:
 
     def _require_open(self) -> int:
         if self._handle is None:
-            raise LibraryError(-7, "算法库已释放")
+            raise LibraryError(-7, "algorithm database released")
         return self._handle
 
     def __repr__(self) -> str:
-        return "FingerprintDB(users={:d}, templates={:d})".format(
-            len(self._user_fids), len(self._fid_templates)
-        )
+        return "FingerprintDB(users={:d}, templates={:d})".format(len(self._user_fids), len(self._fid_templates))
 
     # -- 登记 (一人多指纹) ---------------------------------------------------
 
@@ -134,7 +132,7 @@ class FingerprintDB:
             if target is not None and self._fid_templates.get(fid) != target:
                 continue
             ret = _binding.get_dll(self._dll_path).ZKFPM_DBDel(handle, fid)
-            raise_for(ret, "删除指纹失败 (fid={:d})".format(fid))
+            raise_for(ret, "failed to delete fingerprint (fid={:d})".format(fid))
             del self._fid_to_user[fid]
             del self._fid_templates[fid]
             self._user_fids[user_id].remove(fid)
@@ -184,9 +182,7 @@ class FingerprintDB:
         return {
             "version": _DUMP_VERSION,
             "templates": [
-                [uid, base64.b64encode(t).decode("ascii")]
-                for uid in self.users
-                for t in self.fingers_of(uid)
+                [uid, base64.b64encode(t).decode("ascii")] for uid in self.users for t in self.fingers_of(uid)
             ],
         }
 
@@ -197,25 +193,23 @@ class FingerprintDB:
         ``data`` 结构非法 (版本不符/字段缺失) 抛 :class:`ValueError`。
         """
         if not isinstance(data, dict):
-            raise ValueError("dump 数据必须是 dict")
+            raise ValueError("dump data must be a dict")
         if data.get("version") not in _DUMP_VERSIONS:
             raise ValueError(
-                "不支持的持久化版本: {!r} (支持 {})".format(
-                    data.get("version"), list(_DUMP_VERSIONS)
-                )
+                "unsupported dump version: {!r} (supported: {})".format(data.get("version"), list(_DUMP_VERSIONS))
             )
         templates = data.get("templates")
         if not isinstance(templates, list):
-            raise ValueError("templates 字段缺失或非列表")
+            raise ValueError("'templates' field missing or not a list")
         db = cls()
         for item in templates:
             if not (isinstance(item, list) and len(item) == 2):
-                raise ValueError("templates 项必须是 [user_id, base64字符串]")
+                raise ValueError("templates item must be [user_id, base64 string]")
             user_id, tpl_b64 = item
             try:
                 template = base64.b64decode(tpl_b64)
             except Exception as e:
-                raise ValueError("模板 base64 解码失败: {}".format(e))
+                raise ValueError("template base64 decode failed: {}".format(e))
             db.add(user_id, template)
         return db
 
@@ -224,7 +218,7 @@ class FingerprintDB:
     def merge(self, templates: List[bytes]) -> bytes:
         """将 3 枚采集模板合并为 1 枚登记模板。"""
         if len(templates) != MERGE_COUNT:
-            raise MergeError(-22, "合并需要恰好 {:d} 枚模板".format(MERGE_COUNT))
+            raise MergeError(-22, "merge requires exactly {:d} templates".format(MERGE_COUNT))
         handle = self._require_open()
         bufs = [ctypes.create_string_buffer(bytes(t), len(t)) for t in templates]
         out = ctypes.create_string_buffer(MAX_TEMPLATE_SIZE)
@@ -235,9 +229,7 @@ class FingerprintDB:
         raise_for(ret, "合并登记模板失败")
         return out.raw[: out_len.value]
 
-    def enroll(
-        self, scanner: Scanner, user_id: Union[str, int], poll_interval: float = 0.1
-    ) -> bytes:
+    def enroll(self, scanner: Scanner, user_id: Union[str, int], poll_interval: float = 0.1) -> bytes:
         """完整登记流程: 用 ``scanner`` 采 3 次 -> 合并 -> 存为 ``user_id`` 的指纹。
 
         返回登记模板。进度回调见 :meth:`pyzk20r.device.Scanner.on_enroll_progress`。
@@ -262,11 +254,11 @@ class FingerprintDB:
             handle, buf, len(template), ctypes.byref(fid), ctypes.byref(score)
         )
         if ret == -20:
-            raise MatchError(-20, "1:N 识别无匹配")
+            raise MatchError(-20, "1:N identify: no match")
         raise_for(ret, "识别失败")
         user_id = self._fid_to_user.get(fid.value)
         if user_id is None:
-            raise MatchError(-20, "识别结果无法映射到用户 (fid={:d})".format(fid.value))
+            raise MatchError(-20, "identify result cannot map to user (fid={:d})".format(fid.value))
         return user_id, score.value
 
     def verify(self, user_id: Union[str, int], template: bytes) -> int:
@@ -291,13 +283,13 @@ class FingerprintDB:
         if other_err:
             raise_for(
                 other_err,
-                "1:1 验证失败 (user_id={!r})".format(
+                "1:1 verify failed (user_id={!r})".format(
                     user_id,
                 ),
             )
         raise MatchError(
             -20,
-            "1:1 验证不匹配 (user_id={!r})".format(
+            "1:1 verify: no match (user_id={!r})".format(
                 user_id,
             ),
         )
@@ -307,14 +299,12 @@ class FingerprintDB:
         handle = self._require_open()
         buf_a = ctypes.create_string_buffer(bytes(template_a), len(template_a))
         buf_b = ctypes.create_string_buffer(bytes(template_b), len(template_b))
-        ret = _binding.get_dll(self._dll_path).ZKFPM_DBMatch(
-            handle, buf_a, len(template_a), buf_b, len(template_b)
-        )
+        ret = _binding.get_dll(self._dll_path).ZKFPM_DBMatch(handle, buf_a, len(template_a), buf_b, len(template_b))
         if ret > 0:
             return ret  # 正数 = 匹配分数
         if ret == 0 or ret == -20:
-            raise MatchError(-20, "模板比对不匹配")
-        raise error_class(int(ret))(int(ret), "模板比对失败")  # 其他负码 = 底层错误
+            raise MatchError(-20, "template match: no match")
+        raise error_class(int(ret))(int(ret), "template match failed")  # 其他负码 = 底层错误
 
     # -- 阈值 -----------------------------------------------------------------
 

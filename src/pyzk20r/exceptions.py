@@ -9,7 +9,7 @@ from __future__ import absolute_import
 try:
     from typing import Optional
 except ImportError:  # pragma: no cover -- 精简环境缺 typing 时的提示
-    raise ImportError("缺少 typing 模块, 请安装: pip install typing")
+    raise ImportError("typing module not found, please install: pip install typing")
 
 __all__ = [
     "ZKFPMError",
@@ -29,7 +29,7 @@ class ZKFPMError(RuntimeError):
 
     def __init__(self, code: int, message: Optional[str] = None) -> None:
         self.code = int(code)
-        super(ZKFPMError, self).__init__(message or ("SDK 错误码 {:d}".format(self.code)))
+        super(ZKFPMError, self).__init__(message or ("SDK error code {:d}".format(self.code)))
 
 
 class DeviceError(ZKFPMError):
