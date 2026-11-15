@@ -60,7 +60,7 @@ class DeviceInfo(namedtuple("DeviceInfo", "vendor product serial vid_pid")):
     __slots__ = ()
 
 
-class Frame(object):
+class Frame:
     """一次成功采集: 原始灰度图像 + 提取出的指纹模板。"""
 
     __slots__ = ("image", "template", "width", "height", "dpi")
@@ -98,7 +98,7 @@ class Frame(object):
             len(self.template), self.width, self.height, self.dpi)
 
 
-class Scanner(object):
+class Scanner:
     """Live20R 指纹采集器。
 
     构造即打开设备 (无设备抛 :class:`DeviceNotFoundError`);

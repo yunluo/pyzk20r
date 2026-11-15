@@ -17,7 +17,7 @@ IMAGE = bytes((i % 251 for i in range(WIDTH * HEIGHT)))
 MERGED = bytes(range(1, 97))                       # 假登记模板
 
 
-class FakeDLL(object):
+class FakeDLL:
     """实现 pyzk20r 所绑定的全部 SDK 函数, 行为可脚本化。"""
 
     def __init__(self):

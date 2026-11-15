@@ -39,7 +39,7 @@ MERGE_COUNT = 3
 _PATH_ENCODING = "mbcs"
 
 
-class FingerprintDB(object):
+class FingerprintDB:
     """内存指纹模板库 (SDK DBCache 封装), 支持一人多枚指纹。
 
     支持 with 上下文管理; 也可当纯算法库用 (不接设备也能比对模板)。
