@@ -238,12 +238,12 @@ sequenceDiagram
 ## 开发
 
 ```bash
-uv run pytest                     # mock 单元测试 + 真机冒烟 (无设备自动跳过)
-uv run ruff check .               # lint
-uvx ty check                      # 类型检查 (ty 最低支持 3.7; 运行时兼容声明 3.4)
+uv run python -m unittest discover -s tests -v   # mock 单元测试 + 真机冒烟 (无设备自动跳过)
+uv run ruff check .                              # lint
+uvx ty check                                     # 类型检查 (ty 最低支持 3.7; 运行时兼容声明 3.4)
 ```
 
-dev 工具由 `[dependency-groups]` 提供 (pytest), `uv run` 自动同步; ruff/ty 用
+测试用标准库 `unittest`, 不需要安装任何第三方测试依赖; ruff/ty 用
 `uvx` 隔离运行 (不受项目 Python 版本约束影响)。
 
 仓库采用 **src 布局** (`src/pyzk20r/`), 包源码不在仓库根目录, 避免与测试/示例混在一起:

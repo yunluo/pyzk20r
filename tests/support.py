@@ -1,14 +1,14 @@
 # -*- coding: utf-8 -*-
-"""pytest fixtures: 注入伪造的 libzkfp.dll 函数表, 不依赖真设备。"""
+"""测试公共设施: src 路径引导、FakeDLL 函数表与注入基类 (标准库 unittest)。"""
 
 import ctypes
+import os
 import struct
 import sys
-from pathlib import Path
+import unittest
 
-import pytest
-
-sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
+# unittest 不经过 src 布局的安装也能跑: 把仓库的 src/ 插到搜索路径最前
+sys.path.insert(0, os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "src"))
 
 from pyzk20r import _binding  # noqa: E402
 
@@ -186,10 +186,14 @@ class FakeDLL:
         return 85
 
 
-@pytest.fixture
-def fake_dll(monkeypatch):
-    """注入 FakeDLL 并重置初始化引用计数。"""
-    fake = FakeDLL()
-    monkeypatch.setattr(_binding, "dll", fake)
-    monkeypatch.setattr(_binding, "_init_refs", 0)
-    return fake
+class FakeDLLTestCase(unittest.TestCase):
+    """注入 FakeDLL 的测试基类: setUp 换入假 DLL, tearDown 还原现场。"""
+
+    def setUp(self):
+        self.fake_dll = FakeDLL()
+        self._saved = (_binding.dll, _binding._init_refs)
+        _binding.dll = self.fake_dll
+        _binding._init_refs = 0
+
+    def tearDown(self):
+        _binding.dll, _binding._init_refs = self._saved

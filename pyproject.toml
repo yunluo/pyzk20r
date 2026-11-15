@@ -47,19 +47,6 @@ module-root = "src"                           # src 布局: 模块在 src/ 下
 source-include = ["tests/**", "examples/**"]  # sdist 附带测试与示例
 source-exclude = ["**/*.db"]                 # 排除指纹数据文件
 
-[dependency-groups]
-dev = [
-    # pytest 仅在 >=3.7 生效: requires-python 声明 3.4 后, 不加标记 uv 会按全范围
-    # 解析出 pytest 4.x (最后支持 3.4 的版本), 现代 Python 下的测试反而被降级
-    'pytest>=7,<8; python_version >= "3.7"',
-]
-
-[tool.pytest.ini_options]
-testpaths = ["tests"]
-markers = [
-    "real_device: 需要连接 Live20R 真机 (无设备自动跳过)",
-]
-
 [tool.ruff]
 line-length = 100
 target-version = "py37"

@@ -41,7 +41,7 @@ jobs:
         run: python scripts/version.py check
 
   test:
-    name: pytest (py${{ matrix.python-version }})
+    name: unittest (py${{ matrix.python-version }})
     needs: lint
     strategy:
       fail-fast: false
@@ -53,27 +53,26 @@ jobs:
       - uses: astral-sh/setup-uv@v5
         with:
           python-version: ${{ matrix.python-version }}
-      - name: 同步依赖 (含 dev 组)
+      - name: 同步依赖 (项目本体)
         run: uv sync
       - name: 测试 (mock 全量 + 真机冒烟自动跳过)
         env:
           PYTHONIOENCODING: utf-8    # Windows runner 默认 cp1252, 中文输出会崩
-        run: uv run python -m pytest -q
+        run: uv run python -m unittest discover -s tests -v
 
   test-py37:
-    name: pytest (py3.7, CI 可验证下限)
+    name: unittest (py3.7, CI 可验证下限)
     needs: lint
     runs-on: windows-latest
     steps:
       - uses: actions/checkout@v4
-      # uv 不再支持 Python 3.7 (且 uv_build 后端要求 >=3.8), 这一档改用 pip;
+      # uv 不再支持 Python 3.7 (且 uv_build 后端要求 >=3.8), 这一档用裸解释器;
+      # 标准库 unittest 无需安装任何第三方依赖;
       # runner 镜像无 Python 3.4, 库声明的 3.4 下限由 ast 语法守卫测试覆盖
       - uses: actions/setup-python@v5
         with:
           python-version: "3.7"
-      - name: 安装测试依赖
-        run: python -m pip install "pytest<8"
       - name: 测试 (mock 全量 + 真机冒烟自动跳过)
         env:
           PYTHONIOENCODING: utf-8    # Windows runner 默认 cp1252, 中文输出会崩
-        run: python -m pytest -q
+        run: python -m unittest discover -s tests -v
