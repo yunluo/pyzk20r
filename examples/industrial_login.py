@@ -6,7 +6,8 @@
 - 管理端 (班组长/管理员操作): 登记工号 + 指纹 (每人可多枚), 存 SQLite
 - 登录端 (员工操作): 按指纹 -> identify 返回工号 -> 自动登录
 - 灯效反馈: 登记成功/登录成功亮绿灯, 登录失败或采集失败亮红灯
-  (采像白灯由固件在采集时自动点亮, 应用层只管结果灯)
+  (灯效依赖固件支持, 不支持时自动降级为纯文字反馈; 采像白灯由固件
+  在采集时自动点亮, 应用层只管结果灯)
 - 兜底: 设备缺失/手指受伤时, 保留原工号+密码登录
 
 对接你自己的工业软件: 只需实现 ``do_login(工号)`` (弹窗/HTTP/MES API 皆可);
@@ -33,10 +34,18 @@ FLASH_SECONDS = 1.5
 
 def flash_led(dev, color):
     # type: (Scanner, str) -> None
-    """亮 ``color`` 灯 FLASH_SECONDS 秒后熄灭, 作为一次操作的结果反馈。"""
-    dev.led(color)
-    time.sleep(FLASH_SECONDS)
-    dev.led(color, False)
+    """亮 ``color`` 灯 FLASH_SECONDS 秒后熄灭, 作为一次操作的结果反馈。
+
+    灯效是辅助反馈, 不能挡登录主流程: 部分固件/硬件变体没有可编程
+    三色灯 (实测 VID_1B55 PID_0120: green 静默无效, red 直接抛
+    DeviceError), 失败时静默降级为纯文字反馈。
+    """
+    try:
+        dev.led(color)
+        time.sleep(FLASH_SECONDS)
+        dev.led(color, False)
+    except ZKFPMError:
+        pass  # 该设备无灯效硬件, 控制台文字输出已是主反馈
 
 
 # ============ 对接点: 换成你的工业软件登录调用 ============

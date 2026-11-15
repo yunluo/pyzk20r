@@ -89,6 +89,15 @@ class LEDRecordingDLL(FakeDLL):
         return ret
 
 
+class UnsupportedLEDDLL(LEDRecordingDLL):
+    """模拟无可编程三色灯的固件: LED 参数写入一律失败 (实测 PID_0120 行为)。"""
+
+    def ZKFPM_SetParameters(self, handle, code, buf, cb):
+        if int(code) in (Param.LED_WHITE, Param.LED_GREEN, Param.LED_RED):
+            return -17  # SDK 通用失败 (真机 red 即此表现)
+        return LEDRecordingDLL.ZKFPM_SetParameters(self, handle, code, buf, cb)
+
+
 def _load_example(name):
     """按路径加载 examples/ 脚本 (3.4 兼容, 同 test_version 的加载方式)。"""
     path = os.path.join(REPO_DIR, "examples", name)
@@ -169,6 +178,21 @@ class TestIndustrialLoginExample(FakeDLLTestCase):
             with contextlib.redirect_stdout(io.StringIO()):
                 self.example.finger_login(None, db, dev)
         self.assertEqual(self.fake_dll.led_writes, self.RED)
+        dev.close()
+        db.close()
+
+    def test_login_success_without_led_hardware(self):
+        """无三色灯硬件 (LED 写入失败) 时, 灯效静默降级, 登录流程不受影响。"""
+        self.fake_dll = UnsupportedLEDDLL()
+        _binding.dll = self.fake_dll
+        dev = Scanner()
+        db = FingerprintDB()
+        db.add("1001", TEMPLATE)  # 直接入库 -> fid 1, identify 默认命中
+        buf = io.StringIO()
+        with contextlib.redirect_stdout(buf):
+            self.example.finger_login(None, db, dev)
+        self.assertIn("自动登录", buf.getvalue())  # 登录主流程完成
+        self.assertEqual(self.fake_dll.led_writes, [])  # 灯效写入失败被吞掉
         dev.close()
         db.close()
 

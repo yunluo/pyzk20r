@@ -67,7 +67,7 @@ with Scanner() as dev:
 | `fake_detect` (可读写) | 防假指纹开关 |
 | `finger_is_live` | 最近一次采集是否真手指 (`value & 31 == 31`) |
 | `info()` | `DeviceInfo(vendor, product, serial, vid_pid)` |
-| `led('white'/'green'/'red', on)` | 指示灯 |
+| `led('white'/'green'/'red', on)` | 指示灯 (**灯效依赖固件**: 不支持的颜色抛 `DeviceError` 或静默无效, 如实测 VID_1B55 PID_0120 无可编程三色灯; 白灯采集时固件自动点亮) |
 | `template_format` (`'ansi'/'iso'`, 可读写) | 模板标准 |
 | `template_quality(template)` | 模板质量分 |
 | `device_ok` | 设备状态 |
@@ -149,7 +149,7 @@ SQLite 存取完整示例见 `examples/persist.py`。
 | `examples/enroll_verify.py` | 登记 + 1:1 验证 |
 | `examples/identify_1n.py` | 多人登记 + 1:N 识别循环 |
 | `examples/persist.py` | 指纹 SQLite 持久化 |
-| `examples/industrial_login.py` | **工业现场登录改造参考**: 登记工号指纹 -> 刷指纹自动登录 (含工号+密码兜底) |
+| `examples/industrial_login.py` | **工业现场登录改造参考**: 登记工号指纹 -> 刷指纹自动登录 (含工号+密码兜底); 灯效反馈不支持时自动降级 |
 
 ## 登录场景流程 (industrial_login.py)
 
@@ -223,6 +223,12 @@ sequenceDiagram
 
     Note over App,Store: 登记流程: db.enroll(采3次合并) → save_fingerprints() 写 SQLite → 重启后 load_db() 恢复
 ```
+
+> **灯效依赖固件**: 图中的绿/红灯反馈在支持的固件上才生效。实测部分设备
+> 变体 (如 `VID_1B55 PID_0120`) 没有可编程三色指示灯——绿灯静默无效、
+> 红灯被固件拒绝, 示例对此自动降级为纯文字提示, 登录主流程不受影响。
+> 待机/采集时的白灯是采像照明光源, 由固件自动点亮, 与 `led()` 无关。
+> 灯效硬件可用性可用 `scripts/diag_led.py` 检测。
 
 ## DLL 查找顺序
 

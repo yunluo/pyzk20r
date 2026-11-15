@@ -8,6 +8,10 @@
 ### 修复
 
 - `FingerprintDB.dump` 文档示例版本号 1 → 2 (代码实际写 v2, `load` 兼容读 v1)
+- 工业登录示例的灯效反馈不再阻塞登录主流程: 部分设备变体没有可编程
+  三色灯 (实测 VID_1B55 PID_0120: green 静默无效 / red 固件拒绝抛
+  DeviceError), 灯效失败自动降级为纯文字反馈; `Scanner.led` 文档注明
+  灯效的固件依赖; 新增灯效诊断脚本 `scripts/diag_led.py`
 
 ### 新增
 

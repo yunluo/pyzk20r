@@ -236,7 +236,12 @@ class Scanner:
         self.set_param_int(Param.TEMPLATE_FORMAT, fmt)
 
     def led(self, color: str, on: bool = True) -> None:
-        """控制指示灯闪烁, ``color``: 'white' / 'green' / 'red'。"""
+        """控制指示灯闪烁, ``color``: 'white' / 'green' / 'red'。
+
+        灯效支持依赖固件/硬件变体: 不支持的颜色可能抛 :class:`DeviceError`
+        (实测 VID_1B55 PID_0120 的 red), 也可能接受命令但无实际灯效
+        (同一固件的 green); 白灯由固件在采集时自动点亮, 不受本参数控制。
+        """
         try:
             code = _LED_CODES[color]
         except KeyError:
