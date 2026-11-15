@@ -142,6 +142,75 @@ SQLite 存取完整示例见 `examples/persist.py`。
 | `examples/persist.py` | 指纹 SQLite 持久化 |
 | `examples/industrial_login.py` | **工业现场登录改造参考**: 登记工号指纹 -> 刷指纹自动登录 (含工号+密码兜底) |
 
+## 登录场景流程 (industrial_login.py)
+
+```mermaid
+flowchart TD
+    A([程序启动]) --> B["打开 SQLite<br/>load_db() 重建内存指纹库"]
+    B --> C["打开设备 Scanner"]
+    C -->|成功| M1
+    C -->|"设备缺失 (ZKFPMError)"| M2
+
+    subgraph M1["完整模式菜单"]
+        D{"选择"}
+    end
+    subgraph M2["降级模式菜单"]
+        D2{"选择"}
+    end
+
+    D -->|"[1] 指纹登录"| F["等待手指<br/>acquire(timeout=60)"]
+    F -->|"超时 / 采集失败"| D
+    F -->|取到指纹| G["db.identify(模板)<br/>1:N 识别"]
+    G -->|"MatchError 未识别"| H["提示: 未识别<br/>请用工号+密码登录"] --> D
+    G -->|"返回 (工号, 分数)"| I["do_login(工号)<br/>调用你的工业软件 API"]
+    I --> OK([自动登录成功<br/>进入系统])
+
+    D -->|"[2] 登记员工指纹"| K["输入工号<br/>新员工建档 / 老员工追加"]
+    K --> L["按手指 3 次<br/>db.enroll: 采集 → DBMerge → 入库"]
+    L --> S["SQLite 保存<br/>save_fingerprints()"]
+    S --> Q{继续加录一枚?}
+    Q -->|y| L
+    Q -->|N| D
+
+    D -->|"[3] 删除员工"| R["db.remove(工号)<br/>删除 SQLite 记录"] --> D
+
+    D -->|"[p] 工号+密码"| P["check_password(工号, 密码)<br/>对接原口令校验"]
+    D2 -->|"[p] 工号+密码"| P
+    P -->|校验通过| I
+    P -->|密码错误| D
+```
+
+刷指纹自动登录时序:
+
+```mermaid
+sequenceDiagram
+    actor W as 员工
+    participant App as 登录终端<br/>(industrial_login.py)
+    participant DB as FingerprintDB<br/>(内存指纹库)
+    participant SDK as libzkfp.dll<br/>(ZKFinger 算法)
+    participant Store as SQLite<br/>workers.db
+    participant MES as 你的工业软件<br/>do_login(工号)
+
+    Note over App,Store: 程序启动时: load_db() 从 SQLite 重建内存库
+    W->>App: 选择 [1] 指纹登录
+    App->>SDK: acquire(timeout=60) 轮询取像
+    W->>SDK: 按压手指
+    SDK-->>App: Frame(图像 + 模板 ~1.3KB)
+    App->>DB: identify(frame.template)
+    DB->>SDK: ZKFPM_DBIdentify (1:N)
+    SDK-->>DB: fid + 分数
+    DB-->>App: (工号, 分数) 或 MatchError
+
+    alt 识别成功
+        App->>MES: do_login(工号)
+        MES-->>W: 自动登录, 进入系统
+    else 未识别 / 超时
+        App-->>W: 提示改用工号+密码登录
+    end
+
+    Note over App,Store: 登记流程: db.enroll(采3次合并) → save_fingerprints() 写 SQLite → 重启后 load_db() 恢复
+```
+
 ## DLL 查找顺序
 
 1. `Scanner(dll_path=...)` / `FingerprintDB(dll_path=...)` 显式指定
