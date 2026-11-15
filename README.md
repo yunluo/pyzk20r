@@ -238,7 +238,8 @@ sequenceDiagram
 ## 开发
 
 ```bash
-uv run python -m unittest discover -s tests -v   # mock 单元测试 + 真机冒烟 (无设备自动跳过)
+scripts\test_all.bat                              # 本地全量测试: 3.4 / 3.7 / 3.12 三版本
+uv run python -m unittest discover -s tests -v   # 单版本快速跑 (默认跳过真机冒烟)
 uv run ruff check .                              # lint
 uvx ty check                                     # 类型检查 (ty 最低支持 3.7; 运行时兼容声明 3.4)
 ```
@@ -246,11 +247,15 @@ uvx ty check                                     # 类型检查 (ty 最低支持
 测试用标准库 `unittest`, 不需要安装任何第三方测试依赖; ruff/ty 用
 `uvx` 隔离运行 (不受项目 Python 版本约束影响)。
 
+服务端 CI 不做测试, 只保留 lint/构建与版本一致性检查; 测试一律在本地
+(`scripts\test_all.bat`) 跑。真机冒烟默认关闭 (厂商 DLL 跨进程退出状态不稳定),
+连接设备后设 `PYZK20R_REAL_SMOKE=1` 开启。
+
 仓库采用 **src 布局** (`src/pyzk20r/`), 包源码不在仓库根目录, 避免与测试/示例混在一起:
 
 ```
 src/pyzk20r/      库源码
-tests/             单元测试 (FakeDLL 注入) + 真机冒烟
+tests/             单元测试 (FakeDLL 注入) + 真机冒烟 (默认关闭)
 examples/          可运行示例
 scripts/           版本号工具 (防止 tag 与版本号漂移)
 doc/               厂商 SDK 文档 (不入库)

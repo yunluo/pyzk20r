@@ -5,23 +5,10 @@ on:
   push:
     tags: ["v*"]
 
+# 测试在本地跑 (scripts/test_all.bat, 3.4/3.7/3.12), 服务端只做构建校验与发布
 jobs:
-  test:
-    name: test (Windows)
-    runs-on: windows-latest
-    steps:
-      - uses: actions/checkout@v4
-      - uses: astral-sh/setup-uv@v5
-        with:
-          python-version: "3.12"
-      - run: uv sync
-      - run: uv run python -m unittest discover -s tests -v
-        env:
-          PYTHONIOENCODING: utf-8    # Windows runner 默认 cp1252, 中文输出会崩
-
   build:
     name: build & verify version
-    needs: test
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4

@@ -1,10 +1,13 @@
 # -*- coding: utf-8 -*-
-"""真机冒烟测试: 连接 Live20R 时验证 打开->参数->关闭, 无设备自动跳过 (unittest)。
+"""真机冒烟测试: 连接 Live20R 时验证 打开->参数->关闭 (unittest)。
 
+默认关闭: 厂商 DLL 的跨进程退出状态不稳定 (一个进程加载过 libzkfp.dll 后,
+紧接着的测试进程可能被带崩), 设 ``PYZK20R_REAL_SMOKE=1`` 才加载真 DLL。
 用真机跑全流程 (登记/识别) 见 examples/ 目录脚本。
 """
 
 import ctypes
+import os
 import sys
 import unittest
 
@@ -14,6 +17,9 @@ from pyzk20r import _binding
 
 
 @unittest.skipUnless(sys.platform == "win32", "Windows only")
+@unittest.skipUnless(
+    os.environ.get("PYZK20R_REAL_SMOKE") == "1", "set PYZK20R_REAL_SMOKE=1 to enable"
+)
 class TestRealDeviceSmoke(unittest.TestCase):
     """连接真机时验证底层链路; 无驱动/无设备自动 skip。"""
 
