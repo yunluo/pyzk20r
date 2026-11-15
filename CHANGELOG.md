@@ -3,7 +3,7 @@
 本库遵循 [语义化版本](https://semver.org/lang/zh-CN/) (0.x 阶段不保证 API 稳定)。
 发版流程与版本号约定见 README「发版流程」。
 
-## Unreleased
+## v0.1.6 (2026-11-15)
 
 ### 新增
 
