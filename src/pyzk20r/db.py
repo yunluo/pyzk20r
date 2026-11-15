@@ -190,10 +190,11 @@ class FingerprintDB:
 
         返回::
 
-            {"version": 1,
+            {"version": 2,
              "templates": [[user_id, "BASE64模板"], ...]}
 
-        与 :meth:`load` 配对使用; 内存库本身不落盘, 进程退出即消失。
+        与 :meth:`load` 配对使用 (load 兼容读取 v1 旧结构); 内存库本身不落盘,
+        进程退出即消失。
         """
         return {
             "version": _DUMP_VERSION,
@@ -258,7 +259,7 @@ class FingerprintDB:
 
         返回登记模板。进度回调见 :meth:`pyzk20r.device.Scanner.on_enroll_progress`。
         ``poll_interval`` / ``timeout`` 语义同 :meth:`Scanner.enroll`;
-        ``timeout`` 到点抛 :class:`CaptureError` (自助终端防挂死必传)。
+        ``timeout`` 到点抛 :class:`CaptureTimeoutError` (自助终端防挂死必传)。
         """
         templates = scanner.enroll(poll_interval=poll_interval, timeout=timeout)
         reg = self.merge(templates)

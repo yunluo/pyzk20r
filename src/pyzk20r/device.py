@@ -11,7 +11,7 @@
             img = frame.to_bmp()
             break
 
-子类可覆写 ``on_enroll_progress`` / ``acquire`` / ``_try_acquire`` 等钩子。
+子类可覆写 ``on_enroll_progress`` / ``acquire`` / ``try_acquire`` 等钩子。
 语法兼容 Python 3.4+ (Windows XP): 类型标注用内联标注 (PEP 3107) + typing 构造
 (3.4 无内置 typing, 声明了 ``typing; python_version < "3.5"`` 依赖自动补齐)。
 """
@@ -26,7 +26,7 @@ from collections import namedtuple
 from . import _binding
 from ._binding import MAX_TEMPLATE_SIZE, Param, ZKFPErr
 from .exceptions import (
-    CaptureError,
+    CaptureTimeoutError,
     DeviceError,
     DeviceNotFoundError,
     ZKFPMError,
@@ -283,11 +283,11 @@ class Scanner:
         raise_for(ret, "failed to acquire fingerprint image")
         return buf.raw
 
-    def _try_acquire(self, params: Optional[Tuple[int, int, int]] = None) -> Optional[Frame]:
+    def try_acquire(self, params: Optional[Tuple[int, int, int]] = None) -> Optional[Frame]:
         """尝试采集一次; 瞬态失败 (暂无手指等) 返回 None, 其他错误抛异常。
 
-        ``params`` 为 (width, height, dpi), 采集循环内传入可避免每轮重复查询;
-        ``None`` 表示内部自行获取。子类覆写时请保留该可选参数。
+        公开扩展点: ``params`` 为 (width, height, dpi), 采集循环内传入可避免
+        每轮重复查询; ``None`` 表示内部自行获取。子类覆写时请保留该可选参数。
         """
         handle = self._require_open()
         if params is None:
@@ -309,7 +309,8 @@ class Scanner:
         """阻塞等待手指并采集一次。
 
         反复轮询直到取像成功 (语义与文档一致: 需有手指才返回)。
-        ``timeout`` 为最长等待秒数, 超时抛 :class:`CaptureError`;
+        ``timeout`` 为最长等待秒数, 超时抛 :class:`CaptureTimeoutError`
+        (:class:`CaptureError` 子类, 与取像故障可区分);
         ``None`` 表示一直等到有手指 (Ctrl+C 可中断)。
         采集参数 (宽高/DPI) 在进入循环时读取一次并复用; 运行中改动
         参数请退出后重新调用。
@@ -317,11 +318,11 @@ class Scanner:
         params = self.capture_params()
         deadline = None if timeout is None else time.monotonic() + timeout
         while True:
-            frame = self._try_acquire(params)
+            frame = self.try_acquire(params)
             if frame is not None:
                 return frame
             if deadline is not None and time.monotonic() >= deadline:
-                raise CaptureError(int(ZKFPErr.CAPTURE), "capture timeout ({}s)".format(timeout))
+                raise CaptureTimeoutError(int(ZKFPErr.CAPTURE), "capture timeout ({}s)".format(timeout))
             if poll_interval > 0:
                 time.sleep(poll_interval)
 
@@ -334,7 +335,7 @@ class Scanner:
         """
         params = self.capture_params()
         while True:
-            frame = self._try_acquire(params)
+            frame = self.try_acquire(params)
             if frame is not None:
                 yield frame
             elif poll_interval > 0:
@@ -345,7 +346,8 @@ class Scanner:
 
         每成功一次调用一次 :meth:`on_enroll_progress` 钩子。
         ``timeout`` 为整个登记流程的最长等待秒数 (含所有失败重试),
-        超时抛 :class:`CaptureError`; ``None`` 表示一直等。
+        超时抛 :class:`CaptureTimeoutError` (:class:`CaptureError` 子类);
+        ``None`` 表示一直等。
         自助终端等无人值守场景务必传 timeout, 防止用户中途离开导致无限阻塞。
         """
         total = 3
@@ -353,13 +355,13 @@ class Scanner:
         deadline = None if timeout is None else time.monotonic() + timeout
         templates = []  # type: List[bytes]
         while len(templates) < total:
-            frame = self._try_acquire(params)
+            frame = self.try_acquire(params)
             if frame is not None:
                 templates.append(frame.template)
                 self.on_enroll_progress(len(templates), total)
                 continue
             if deadline is not None and time.monotonic() >= deadline:
-                raise CaptureError(int(ZKFPErr.CAPTURE), "enroll timeout ({}s)".format(timeout))
+                raise CaptureTimeoutError(int(ZKFPErr.CAPTURE), "enroll timeout ({}s)".format(timeout))
             if poll_interval > 0:
                 time.sleep(poll_interval)
         return templates

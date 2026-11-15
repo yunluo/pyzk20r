@@ -21,6 +21,7 @@ from .db import FingerprintDB
 from .device import DeviceInfo, Frame, Scanner
 from .exceptions import (
     CaptureError,
+    CaptureTimeoutError,
     DeviceError,
     DeviceNotFoundError,
     ExtractError,
@@ -48,6 +49,7 @@ __all__ = [
     "DeviceError",
     "DeviceNotFoundError",
     "CaptureError",
+    "CaptureTimeoutError",
     "MatchError",
     "MergeError",
     "ExtractError",

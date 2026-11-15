@@ -59,7 +59,7 @@ with Scanner() as dev:
 
 | 成员 | 说明 |
 | --- | --- |
-| `acquire(poll_interval=0.1, timeout=None)` | **阻塞等待手指**并采集一帧 → `Frame`; `timeout` 秒超时抛 `CaptureError` (`None` 为一直等) |
+| `acquire(poll_interval=0.1, timeout=None)` | **阻塞等待手指**并采集一帧 → `Frame`; `timeout` 秒超时抛 `CaptureTimeoutError` (`CaptureError` 子类, 可区分"未按手指"与"取像故障"; `None` 为一直等) |
 | `capture(poll_interval=0.1)` | 持续采集生成器, 逐帧 `yield Frame` (设备关闭后下一次迭代抛 `ZKFPMError`) |
 | `acquire_image()` | 只取图像字节 |
 | `enroll(poll_interval=0.1, timeout=None)` | 连续采集 3 次 (SDK 合并固定要求) 返回模板列表, 每次回调 `on_enroll_progress(done, total)`; 无人值守场景务必传 `timeout` |
@@ -100,6 +100,7 @@ ZKFPMError (含 .code 原始 SDK 错误码)
 ├── DeviceError
 │   └── DeviceNotFoundError      # -3 无设备 / -6 打开失败
 ├── CaptureError                 # -8 取像失败等
+│   └── CaptureTimeoutError      # 应用传入的 timeout 到点仍无手指
 ├── MatchError                   # -20 不匹配
 ├── MergeError                   # -22 合并失败
 ├── ExtractError                 # -9/-26/-27 图像提取失败
@@ -109,7 +110,7 @@ ZKFPMError (含 .code 原始 SDK 错误码)
 ### 继承点
 
 - `Scanner.on_enroll_progress(done, total)` — 登记进度钩子
-- `Scanner._try_acquire()` — 采集前后的自定义处理 (如防假判定重试)
+- `Scanner.try_acquire(params=None)` — 采集前后的自定义处理 (如防假判定重试); 覆写请保留可选 `params` 参数 (v0.1.4 及之前为私有名 `_try_acquire`)
 - `Scanner` / `FingerprintDB` 所有公开方法均可覆写
 
 ### 线程模型

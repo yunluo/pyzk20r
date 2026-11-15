@@ -16,6 +16,7 @@ __all__ = [
     "DeviceError",
     "DeviceNotFoundError",
     "CaptureError",
+    "CaptureTimeoutError",
     "MatchError",
     "MergeError",
     "ExtractError",
@@ -42,6 +43,15 @@ class DeviceNotFoundError(DeviceError):
 
 class CaptureError(ZKFPMError):
     """取像失败 (-8/-12/-18/-28 等)。"""
+
+
+class CaptureTimeoutError(CaptureError):
+    """采集等待超时 (应用传入的 ``timeout`` 到点仍无手指)。
+
+    是 :class:`CaptureError` 的子类型: 无人值守场景常需区分
+    "用户未按手指" (超时) 与 "传感器故障" (取像失败), 两者处置不同;
+    已有 ``except CaptureError`` 分支不受影响。
+    """
 
 
 class MatchError(ZKFPMError):

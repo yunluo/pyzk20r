@@ -10,7 +10,7 @@ from support import DPI, HEIGHT, IMAGE, TEMPLATE, WIDTH, FakeDLLTestCase
 
 from pyzk20r import Scanner, ZKFPErr, ZKFPMError, _binding
 from pyzk20r.device import Frame
-from pyzk20r.exceptions import CaptureError, DeviceNotFoundError
+from pyzk20r.exceptions import CaptureError, CaptureTimeoutError, DeviceNotFoundError
 
 
 class RecordingScanner(Scanner):
@@ -105,12 +105,15 @@ class TestDevice(FakeDLLTestCase):
         self.assertEqual(frame.dpi, DPI)
         self.assertEqual(frame.image[:10], IMAGE[:10])
 
-    def test_acquire_raises_on_persistent_fail(self):
-        """超时后抛 CaptureError (timeout=0 即立即超时)。"""
+    def test_acquire_timeout_raises_capture_timeout(self):
+        """超时抛 CaptureTimeoutError (timeout=0 即立即超时)。"""
         self.fake_dll.acquire_queue = [-8, -8, -8]
         with Scanner() as dev:
-            with self.assertRaises(CaptureError):
+            with self.assertRaises(CaptureTimeoutError) as cm:
                 dev.acquire(poll_interval=0, timeout=0)
+        # 向后兼容契约: CaptureTimeoutError 是 CaptureError 子类, 旧分支不受影响
+        self.assertIsInstance(cm.exception, CaptureError)
+        self.assertEqual(cm.exception.code, int(ZKFPErr.CAPTURE))
 
     def test_acquire_waits_for_finger(self):
         """阻塞等待语义: 前两次失败 (暂无手指), 第三次成功。"""
@@ -126,6 +129,21 @@ class TestDevice(FakeDLLTestCase):
             frame = next(gen)
             self.assertEqual(frame.template, TEMPLATE)
             gen.close()
+
+    def test_try_acquire_override_hook(self):
+        """公开扩展点: 子类覆写 try_acquire (原 _try_acquire) 可拦截采集。"""
+        calls = []
+
+        class HookScanner(Scanner):
+            def try_acquire(self, params=None):
+                calls.append(params is not None)
+                return super(HookScanner, self).try_acquire(params)
+
+        dev = HookScanner()
+        frame = dev.acquire(poll_interval=0)
+        dev.close()
+        self.assertEqual(frame.template, TEMPLATE)
+        self.assertEqual(calls, [True])
 
     def test_acquire_image(self):
         with Scanner() as dev:
@@ -206,18 +224,18 @@ class TestDevice(FakeDLLTestCase):
         self.assertEqual(cm.exception.code, int(ZKFPErr.NO_DEVICE))
 
     def test_enroll_timeout_raises(self):
-        """无人值守防线: 登记超时抛 CaptureError, 不无限阻塞。"""
+        """无人值守防线: 登记超时抛 CaptureTimeoutError, 不无限阻塞。"""
         self.fake_dll.acquire_queue = [-8] * 10
         dev = RecordingScanner()
-        with self.assertRaises(CaptureError):
+        with self.assertRaises(CaptureTimeoutError):
             dev.enroll(poll_interval=0, timeout=0)
         dev.close()
 
     def test_enroll_timeout_partial_progress(self):
-        """采到 2 枚后超时: 抛 CaptureError, 已采模板不部分返回。"""
+        """采到 2 枚后超时: 抛 CaptureTimeoutError, 已采模板不部分返回。"""
         self.fake_dll.acquire_queue = [0, 0, -8, -8]
         dev = RecordingScanner()
-        with self.assertRaises(CaptureError):
+        with self.assertRaises(CaptureTimeoutError):
             dev.enroll(poll_interval=0, timeout=0)
         self.assertEqual(dev.progress_calls, [(1, 3), (2, 3)])
         dev.close()

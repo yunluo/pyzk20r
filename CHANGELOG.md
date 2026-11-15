@@ -3,6 +3,23 @@
 本库遵循 [语义化版本](https://semver.org/lang/zh-CN/) (0.x 阶段不保证 API 稳定)。
 发版流程与版本号约定见 README「发版流程」。
 
+## Unreleased
+
+### 修复
+
+- `FingerprintDB.dump` 文档示例版本号 1 → 2 (代码实际写 v2, `load` 兼容读 v1)
+
+### 新增
+
+- `CaptureTimeoutError` (`CaptureError` 子类): `acquire` / `enroll` 超时改抛该
+  类型, 无人值守场景可按异常类型区分 "用户未按手指" 与 "取像故障";
+  已有 `except CaptureError` 分支不受影响
+
+### 变更
+
+- `Scanner._try_acquire` 更名为公开扩展点 `Scanner.try_acquire` (0.x 窗口期
+  完成; 子类覆写请改用新名, 签名保留可选 `params` 参数的约定不变)
+
 ## v0.1.4 (2026-11-15)
 
 ### 稳定性
