@@ -20,6 +20,7 @@ typing 构造以字符串形式标注 (运行时不求值), 变量类型用注�
 """
 from __future__ import absolute_import
 
+import base64
 import ctypes
 
 from . import _binding
@@ -31,6 +32,9 @@ __all__ = ["FingerprintDB"]
 
 #: 登记合并所需模板数 (ZKFPM_DBMerge 固定 3 枚)
 MERGE_COUNT = 3
+
+#: dump()/load() 持久化结构版本号
+_DUMP_VERSION = 1
 
 #: 字符串路径编码 (Windows ANSI, 兼容 XP)
 _PATH_ENCODING = "mbcs"
@@ -136,6 +140,51 @@ class FingerprintDB:
     def fingers_of(self, user_id: int) -> "list[bytes]":
         """某用户已登记的全部模板 (bytes 列表)。"""
         return [self._fid_templates[f] for f in self._user_fids.get(user_id, [])]
+
+    # -- 持久化契约 (存储介质与时机由应用层决定) -------------------------------
+
+    def dump(self) -> dict:
+        """导出全部指纹为 JSON 兼容结构, 供应用层落盘 (json/sqlite/文件均可)。
+
+        返回::
+
+            {"version": 1,
+             "templates": [[user_id, "BASE64模板"], ...]}
+
+        与 :meth:`load` 配对使用; 内存库本身不落盘, 进程退出即消失。
+        """
+        return {
+            "version": _DUMP_VERSION,
+            "templates": [[uid, base64.b64encode(t).decode("ascii")]
+                          for uid in self.users
+                          for t in self.fingers_of(uid)],
+        }
+
+    @classmethod
+    def load(cls, data: dict) -> "FingerprintDB":
+        """从 :meth:`dump` 的结构重建内存指纹库 (一人多指纹关系原样恢复)。
+
+        ``data`` 结构非法 (版本不符/字段缺失) 抛 :class:`ValueError`。
+        """
+        if not isinstance(data, dict):
+            raise ValueError("dump 数据必须是 dict")
+        if data.get("version") != _DUMP_VERSION:
+            raise ValueError(
+                "不支持的持久化版本: %r (期望 %d)" % (data.get("version"), _DUMP_VERSION))
+        templates = data.get("templates")
+        if not isinstance(templates, list):
+            raise ValueError("templates 字段缺失或非列表")
+        db = cls()
+        for item in templates:
+            if not (isinstance(item, list) and len(item) == 2):
+                raise ValueError("templates 项必须是 [user_id, base64字符串]")
+            user_id, tpl_b64 = item
+            try:
+                template = base64.b64decode(tpl_b64)
+            except Exception as e:
+                raise ValueError("模板 base64 解码失败: %s" % e)
+            db.add(user_id, template)
+        return db
 
     # -- 合并与登记流程 -------------------------------------------------------
 

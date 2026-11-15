@@ -89,6 +89,7 @@ with Scanner() as dev:
 | `merge([t1, t2, t3])` | 3 枚采集模板合并为登记模板 |
 | `remove(user_id[, template])` | 删除某用户的全部/指定指纹 |
 | `clear() / count / users / fingers_of(user_id)` | 库管理 |
+| `dump() / load(data)` | 持久化契约: 导出/重建 JSON 兼容结构 (存储介质与时机由应用层决定) |
 | `threshold_1_1 / threshold_1_n` (可读写) | 比对阈值, 默认 35 / 55 (0~100) |
 | `extract_from_image(path, dpi=500)` | 从 BMP 提取模板 (仅 SDK 标准版) |
 
@@ -116,6 +117,20 @@ ZKFPMError (含 .code 原始 SDK 错误码)
 本库是**同步单线程**设计: 无内部线程, SDK 句柄与全局初始化计数不加锁。
 请勿在多线程中并发构造/关闭设备或并发采集; 需要后台采集请自行承载线程,
 线程内独占使用一个 `Scanner`。
+
+### 持久化
+
+内存指纹库**不自动落盘**, 进程退出即消失; 持久化由应用层用 `dump()/load()` 接入任意介质:
+
+```python
+import json
+data = db.dump()                                   # {"version": 1, "templates": [[uid, "BASE64"], ...]}
+json.dump(data, open("fingers.json", "w"))
+
+db = FingerprintDB.load(json.load(open("fingers.json")))   # 启动时重建, 无需重新按手指
+```
+
+SQLite 存取完整示例见 `examples/persist.py`。
 
 ## DLL 查找顺序
 

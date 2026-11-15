@@ -151,6 +151,53 @@ def test_extract_from_image_load_fail(fake_dll):
             db.extract_from_image(r"C:\missing.bmp")
 
 
+def test_dump_load_roundtrip(fake_dll):
+    """dump -> load 往返: 一人多指纹关系与模板字节原样恢复。"""
+    db = FingerprintDB()
+    db.add(1001, TPL_A)
+    db.add(1001, TPL_B)
+    db.add(1002, TPL_C)
+    data = db.dump()
+    assert data["version"] == 1
+    db.close()
+
+    db2 = FingerprintDB.load(data)
+    assert db2.users == [1001, 1002]
+    assert db2.fingers_of(1001) == [TPL_A, TPL_B]
+    assert db2.fingers_of(1002) == [TPL_C]
+    assert db2.count == 3
+    db2.close()
+
+
+def test_dump_load_json_roundtrip(fake_dll):
+    import json
+    db = FingerprintDB()
+    db.add(7, TPL_A)
+    text = json.dumps(db.dump())                   # 应用层用 json 落盘
+    db.close()
+    db2 = FingerprintDB.load(json.loads(text))
+    assert db2.fingers_of(7) == [TPL_A]
+    db2.close()
+
+
+def test_load_rejects_bad_payload(fake_dll):
+    with pytest.raises(ValueError):
+        FingerprintDB.load({"version": 99, "templates": []})
+    with pytest.raises(ValueError):
+        FingerprintDB.load({"version": 1})         # 缺 templates
+    with pytest.raises(ValueError):
+        FingerprintDB.load({"version": 1, "templates": [["not-a-list"]]})
+    with pytest.raises(ValueError):
+        FingerprintDB.load("not-a-dict")
+    with pytest.raises(ValueError):
+        FingerprintDB.load({"version": 1, "templates": [[1, "!!not-base64!!"]]})
+
+
+def test_dump_empty_db(fake_dll):
+    with FingerprintDB() as db:
+        assert db.dump() == {"version": 1, "templates": []}
+
+
 def test_operations_on_closed_db_raise(fake_dll):
     db = FingerprintDB()
     db.close()
