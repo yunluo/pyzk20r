@@ -1,11 +1,11 @@
 # -*- coding: utf-8 -*-
 """登记 + 1:1 验证演示。
 
-给 user 1001 连续登记两枚指纹, 然后现场采集并用 1:1 验证身份。
+给工号 1001 连续登记两枚指纹, 然后现场采集并用 1:1 验证身份。
 """
 from pyzk20r import FingerprintDB, MatchError, Scanner
 
-USER = 1001
+USER = "1001"
 
 
 def main():

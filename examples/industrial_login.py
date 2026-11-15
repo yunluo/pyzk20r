@@ -8,7 +8,7 @@
 - 兜底: 设备缺失/手指受伤时, 保留原工号+密码登录
 
 对接你自己的工业软件: 只需实现 ``do_login(工号)`` (弹窗/HTTP/MES API 皆可);
-工号含字母等非数字字符时, 在员工表里加一层 "数字内部ID <-> 工号字符串" 映射即可。
+工号为任意字符串 (如 ``"A00123"``), 直接作为 user_id 使用。
 """
 import sqlite3
 import sys
@@ -20,13 +20,13 @@ DB_FILE = "workers.db"
 # ============ 对接点: 换成你的工业软件登录调用 ============
 
 def do_login(worker_id):
-    # type: (int) -> None
+    # type: (str) -> None
     """识别成功后的自动登录动作, 把这里换成你的工业软件登录 API。"""
-    print(">>> 自动登录: 工号 %d (此处调用你的工业软件)" % worker_id)
+    print(">>> 自动登录: 工号 %s (此处调用你的工业软件)" % worker_id)
 
 
 def check_password(worker_id, password):
-    # type: (int, str) -> bool
+    # type: (str, str) -> bool
     """兜底登录的口令校验, 对接你原来的工号+密码逻辑。示例恒真。"""
     return True  # TODO: 接你原来的密码表/哈希校验
 
@@ -35,9 +35,9 @@ def check_password(worker_id, password):
 def open_store():
     conn = sqlite3.connect(DB_FILE)
     conn.execute("CREATE TABLE IF NOT EXISTS workers ("
-                 "worker_id INTEGER PRIMARY KEY, password TEXT NOT NULL DEFAULT '')")
+                 "worker_id TEXT PRIMARY KEY, password TEXT NOT NULL DEFAULT '')")
     conn.execute("CREATE TABLE IF NOT EXISTS fingerprints ("
-                 "worker_id INTEGER NOT NULL, seq INTEGER NOT NULL, tpl BLOB NOT NULL,"
+                 "worker_id TEXT NOT NULL, seq INTEGER NOT NULL, tpl BLOB NOT NULL,"
                  " PRIMARY KEY (worker_id, seq))")
     return conn
 
@@ -61,18 +61,16 @@ def save_fingerprints(conn, worker_id, templates):
 # ============ 管理端: 登记 ============
 
 def register_worker(conn, db, dev):
-    raw = input("输入工号 (数字): ").strip()
-    if not raw.isdigit():
-        print("工号必须为数字 (字母工号请自建 数字ID<->工号 映射表)")
+    worker_id = input("输入工号: ").strip()
+    if not worker_id:
         return
-    worker_id = int(raw)
     row = conn.execute("SELECT 1 FROM workers WHERE worker_id=?", (worker_id,)).fetchone()
     if row is None:
         conn.execute("INSERT INTO workers (worker_id) VALUES (?)", (worker_id,))
         conn.commit()
-        print("员工 %d 已登记, 请依次按压手指" % worker_id)
+        print("员工 %s 已登记, 请依次按压手指" % worker_id)
     else:
-        print("员工 %d 已存在, 追加一枚新指纹" % worker_id)
+        print("员工 %s 已存在, 追加一枚新指纹" % worker_id)
 
     while True:
         print("第 %d 枚指纹: 请按压手指 3 次..." % (len(db.fingers_of(worker_id)) + 1))
@@ -85,15 +83,14 @@ def register_worker(conn, db, dev):
 
 
 def remove_worker(conn, db):
-    raw = input("输入要删除的工号: ").strip()
-    if not raw.isdigit():
+    worker_id = input("输入要删除的工号: ").strip()
+    if not worker_id:
         return
-    worker_id = int(raw)
     db.remove(worker_id)
     conn.execute("DELETE FROM fingerprints WHERE worker_id=?", (worker_id,))
     conn.execute("DELETE FROM workers WHERE worker_id=?", (worker_id,))
     conn.commit()
-    print("员工 %d 及其指纹已删除" % worker_id)
+    print("员工 %s 及其指纹已删除" % worker_id)
 
 
 # ============ 登录端 ============
@@ -110,17 +107,17 @@ def finger_login(conn, db, dev):
     except MatchError:
         print("未识别 (阈值 %d), 可用工号+密码登录" % db.threshold_1_n)
         return
-    print("识别: 工号 %d, 分数 %d" % (worker_id, score))
+    print("识别: 工号 %s, 分数 %d" % (worker_id, score))
     do_login(worker_id)                            # <- 自动登录
 
 
 def password_login(conn):
-    raw = input("工号: ").strip()
-    if not raw.isdigit():
+    worker_id = input("工号: ").strip()
+    if not worker_id:
         return
     password = input("密码: ")
-    if check_password(int(raw), password):
-        do_login(int(raw))
+    if check_password(worker_id, password):
+        do_login(worker_id)
     else:
         print("密码错误")
 

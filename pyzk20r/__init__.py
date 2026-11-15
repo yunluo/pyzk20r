@@ -10,7 +10,7 @@
 
     db = FingerprintDB()
     with Scanner() as dev:
-        db.enroll(dev, user_id=1001)                 # 登记一枚指纹 (采 3 次)
+        db.enroll(dev, user_id="A001")               # 登记一枚指纹 (采 3 次, 工号为字符串)
         uid, score = db.identify(dev.acquire().template)
 """
 

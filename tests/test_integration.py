@@ -20,16 +20,16 @@ def test_enroll_identify_verify_flow(fake_dll):
     """登记 2 人各 1 枚 -> 识别返回对应用户 -> 1:1 验证通过。"""
     db = FingerprintDB()
     with Scanner() as dev:
-        db.enroll(dev, user_id=1001, poll_interval=0)
+        db.enroll(dev, user_id="1001", poll_interval=0)
         assert fake_dll.db_adds[1] == MERGED        # 3 次采集合并入库
         assert db.count == 1
-        db.add(1002, TEMPLATE)
+        db.add("1002", TEMPLATE)
         fake_dll.db_ident_result = (1, 97)
         user_id, score = db.identify(dev.acquire().template)
-        assert user_id == 1001
+        assert user_id == "1001"
         assert score == 97
         fake_dll.verify_scores = {1: 80}
-        assert db.verify(1001, dev.acquire().template) == 80
+        assert db.verify("1001", dev.acquire().template) == 80
     db.close()
 
 
@@ -37,11 +37,11 @@ def test_enroll_multiple_fingers_same_user(fake_dll):
     """同一人连续登记两枚指纹 (两次完整登记流程)。"""
     db = FingerprintDB()
     with Scanner() as dev:
-        db.enroll(dev, 1001, poll_interval=0)
-        db.enroll(dev, 1001, poll_interval=0)
+        db.enroll(dev, "1001", poll_interval=0)
+        db.enroll(dev, "1001", poll_interval=0)
         assert db.count == 2
-        assert db.fingers_of(1001) == [MERGED, MERGED]
-        assert db.users == [1001]
+        assert db.fingers_of("1001") == [MERGED, MERGED]
+        assert db.users == ["1001"]
     db.close()
 
 

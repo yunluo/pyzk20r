@@ -17,7 +17,7 @@ def open_store():
     conn = sqlite3.connect(DB_FILE)
     conn.execute(
         "CREATE TABLE IF NOT EXISTS templates ("
-        " user_id INTEGER NOT NULL,"
+        " user_id TEXT NOT NULL,"
         " tpl BLOB NOT NULL,"
         " seq INTEGER NOT NULL,"
         " PRIMARY KEY (user_id, seq))"
@@ -51,8 +51,8 @@ def main():
     if first_run or not conn.execute("SELECT 1 FROM templates").fetchone():
         db = FingerprintDB()
         with Scanner() as dev:
-            for uid in (1001, 1002):
-                print("用户 %d: 请按压手指 3 次..." % uid)
+            for uid in ("1001", "1002"):
+                print("工号 %s: 请按压手指 3 次..." % uid)
                 templates = dev.enroll()
                 db.add(uid, db.merge(templates))
                 save_user(conn, uid, db.fingers_of(uid))

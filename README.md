@@ -32,15 +32,15 @@ db = FingerprintDB()
 with Scanner() as dev:                       # 构造即打开, 退出自动关闭
     print(dev.info())                        # 厂商/产品名/序列号/VID&PID
 
-    # 登记: 采 3 次自动合并入库 (同一用户可多次调用 = 多枚指纹)
-    tpl = db.enroll(dev, user_id=1001)
+    # 登记: 采 3 次自动合并入库 (同一工号可多次调用 = 多枚指纹)
+    tpl = db.enroll(dev, user_id="1001")
 
     # 1:N 识别 -> (user_id, 分数)
     frame = dev.acquire()                    # 阻塞等待一次按压
     uid, score = db.identify(frame.template)
 
     # 1:1 验证 -> 分数 (对该用户所有指纹取最优)
-    score = db.verify(1001, dev.acquire().template)
+    score = db.verify("1001", dev.acquire().template)
 ```
 
 持续采集 (生成器):
