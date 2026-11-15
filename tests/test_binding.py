@@ -1,10 +1,13 @@
 # -*- coding: utf-8 -*-
 """DLL 定位与加载测试。"""
 import os
+import sys
 
 import pytest
 
 from pyzk20r import ZKFPMError, _binding
+
+_WIN = sys.platform == "win32"
 
 
 def test_resolve_explicit_path(tmp_path):
@@ -33,15 +36,20 @@ def test_resolve_prefers_system_absolute_path():
         assert path == "libzkfp.dll"
 
 
+@pytest.mark.skipif(not _WIN, reason="仅 Windows")
 def test_load_real_dll_sets_prototypes():
     """加载真 DLL (只声明原型, 不调 Init), 验证加载器与原型绑定。"""
-    dll = _binding.load_dll()
+    try:
+        dll = _binding.load_dll()
+    except OSError as e:
+        pytest.skip("libzkfp.dll 不可用 (未装驱动): %s" % e)
     for name in ("ZKFPM_Init", "ZKFPM_OpenDevice", "ZKFPM_AcquireFingerprint", "ZKFPM_DBIdentify"):
         fn = getattr(dll, name)
         assert fn.argtypes is not None
         assert fn.restype is not None
 
 
+@pytest.mark.skipif(not _WIN, reason="仅 Windows (依赖 ctypes.WinDLL)")
 def test_load_dll_explicit_missing(tmp_path):
     with pytest.raises(OSError):
         _binding.load_dll(str(tmp_path / "nope.dll"))

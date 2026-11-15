@@ -18,7 +18,10 @@ pytestmark = [
 
 
 def test_real_device_smoke():
-    dll = _binding.load_dll()
+    try:
+        dll = _binding.load_dll()
+    except OSError as e:
+        pytest.skip("libzkfp.dll 不可用 (未装驱动): %s" % e)
     ret = dll.ZKFPM_Init()
     if ret not in (0, 1):
         pytest.skip("ZKFPM_Init 失败 (%d)" % ret)

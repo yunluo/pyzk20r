@@ -19,6 +19,7 @@ from __future__ import absolute_import
 
 import collections.abc
 import ctypes
+import os
 import struct
 import time
 from collections import namedtuple
@@ -51,6 +52,9 @@ _LED_CODES = {
 
 #: 字符串参数读取缓冲区大小
 _PARAM_STR_BUF = 256
+
+#: 参数字符串编码 (Windows ANSI; 非 Windows 的 mock 测试环境回退 UTF-8)
+_TEXT_ENCODING = "mbcs" if os.name == "nt" else "utf-8"
 
 
 class DeviceInfo(namedtuple("DeviceInfo", "vendor product serial vid_pid")):
@@ -177,9 +181,9 @@ class Scanner:
         raise_for(ret, "设置参数 %d 失败" % code, DeviceError)
 
     def get_param_str(self, code: int) -> str:
-        """读取字符串型参数 (厂商/产品名/序列号)。忽略不可解码字节 (兼容 GBK 控制台)。"""
+        """读取字符串型参数 (厂商/产品名/序列号)。忽略不可解码字节。"""
         raw = self.get_param_bytes(code, _PARAM_STR_BUF).split(b"\x00")[0]
-        return raw.decode("mbcs", "ignore")
+        return raw.decode(_TEXT_ENCODING, "ignore")
 
     @property
     def width(self) -> int:
