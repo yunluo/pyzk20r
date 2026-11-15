@@ -132,6 +132,16 @@ db = FingerprintDB.load(json.load(open("fingers.json")))   # 启动时重建, �
 
 SQLite 存取完整示例见 `examples/persist.py`。
 
+## 示例
+
+| 脚本 | 用途 |
+| --- | --- |
+| `examples/capture.py` | 采集一帧指纹存 BMP |
+| `examples/enroll_verify.py` | 登记 + 1:1 验证 |
+| `examples/identify_1n.py` | 多人登记 + 1:N 识别循环 |
+| `examples/persist.py` | 指纹 SQLite 持久化 |
+| `examples/industrial_login.py` | **工业现场登录改造参考**: 登记工号指纹 -> 刷指纹自动登录 (含工号+密码兜底) |
+
 ## DLL 查找顺序
 
 1. `Scanner(dll_path=...)` / `FingerprintDB(dll_path=...)` 显式指定
