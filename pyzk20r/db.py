@@ -15,7 +15,8 @@ SDK 内部以唯一 ``fid`` 存储每枚模板; 本层自动分配 fid 并维护
         uid, score = db.identify(dev.acquire().template)
         score = db.verify(1001, dev.acquire().template)
 
-语法兼容 Python 3.4 (Windows XP), 类型使用 PEP 484 注释式标注。
+语法兼容 Python 3.4 (Windows XP): 参数/返回类型用内联标注 (PEP 3107),
+typing 构造以字符串形式标注 (运行时不求值), 变量类型用注释。
 """
 from __future__ import absolute_import
 
@@ -45,8 +46,7 @@ class FingerprintDB:
     支持 with 上下文管理; 也可当纯算法库用 (不接设备也能比对模板)。
     """
 
-    def __init__(self, dll_path=None):
-        # type: (Optional[str]) -> None
+    def __init__(self, dll_path: "Optional[str]" = None) -> None:
         self._dll_path = dll_path
         self._handle = None                            # type: Optional[int]
         handle = _binding.lib_addref(dll_path).ZKFPM_DBInit()
@@ -61,8 +61,7 @@ class FingerprintDB:
 
     # -- 生命周期 -----------------------------------------------------------
 
-    def close(self):
-        # type: () -> None
+    def close(self) -> None:
         """释放算法库。可安全重复调用。"""
         if self._handle is None:
             return
@@ -71,28 +70,24 @@ class FingerprintDB:
         _binding.lib_release()
         raise_for(ret, "释放算法库失败")
 
-    def __enter__(self):
-        # type: () -> FingerprintDB
+    def __enter__(self) -> "FingerprintDB":
         return self
 
-    def __exit__(self, exc_type, exc_val, exc_tb):
-        # type: (type, BaseException, object) -> None
+    def __exit__(self, exc_type: type, exc_val: BaseException, exc_tb: object) -> None:
         self.close()
 
-    def _require_open(self):
-        # type: () -> int
+    def _require_open(self) -> int:
         if self._handle is None:
             raise LibraryError(-7, "算法库已释放")
         return self._handle
 
-    def __repr__(self):
+    def __repr__(self) -> str:
         return "FingerprintDB(users=%d, templates=%d)" % (
             len(self._user_fids), len(self._fid_templates))
 
     # -- 登记 (一人多指纹) ---------------------------------------------------
 
-    def add(self, user_id, template):
-        # type: (int, bytes) -> None
+    def add(self, user_id: int, template: bytes) -> None:
         """为 ``user_id`` 添加一枚指纹模板; 同一 user 可多次调用登记多枚。"""
         handle = self._require_open()
         fid = self._next_fid
@@ -104,8 +99,7 @@ class FingerprintDB:
         self._fid_templates[fid] = bytes(template)
         self._user_fids.setdefault(user_id, []).append(fid)
 
-    def remove(self, user_id, template=None):
-        # type: (int, Optional[bytes]) -> None
+    def remove(self, user_id: int, template: "Optional[bytes]" = None) -> None:
         """删除某用户的指纹; 传 ``template`` 只删匹配的那一枚, 否则全删。"""
         handle = self._require_open()
         target = bytes(template) if template is not None else None
@@ -120,8 +114,7 @@ class FingerprintDB:
         if not self._user_fids.get(user_id):
             self._user_fids.pop(user_id, None)
 
-    def clear(self):
-        # type: () -> None
+    def clear(self) -> None:
         """清空全部指纹。"""
         handle = self._require_open()
         ret = _binding.get_dll(self._dll_path).ZKFPM_DBClear(handle)
@@ -131,8 +124,7 @@ class FingerprintDB:
         self._user_fids.clear()
 
     @property
-    def count(self):
-        # type: () -> int
+    def count(self) -> int:
         """库内模板总数。"""
         handle = self._require_open()
         n = ctypes.c_uint()
@@ -141,20 +133,17 @@ class FingerprintDB:
         return n.value
 
     @property
-    def users(self):
-        # type: () -> List[int]
+    def users(self) -> "List[int]":
         """已登记的用户 ID 列表 (升序)。"""
         return sorted(self._user_fids)
 
-    def fingers_of(self, user_id):
-        # type: (int) -> List[bytes]
+    def fingers_of(self, user_id: int) -> "List[bytes]":
         """某用户已登记的全部模板 (bytes 列表)。"""
         return [self._fid_templates[f] for f in self._user_fids.get(user_id, [])]
 
     # -- 合并与登记流程 -------------------------------------------------------
 
-    def merge(self, templates):
-        # type: (List[bytes]) -> bytes
+    def merge(self, templates: "List[bytes]") -> bytes:
         """将 3 枚采集模板合并为 1 枚登记模板。"""
         if len(templates) != MERGE_COUNT:
             raise MergeError(-22, "合并需要恰好 %d 枚模板" % MERGE_COUNT)
@@ -167,8 +156,7 @@ class FingerprintDB:
         raise_for(ret, "合并登记模板失败")
         return out.raw[:out_len.value]
 
-    def enroll(self, scanner, user_id, poll_interval=0.1):
-        # type: (Scanner, int, float) -> bytes
+    def enroll(self, scanner: "Scanner", user_id: int, poll_interval: float = 0.1) -> bytes:
         """完整登记流程: 用 ``scanner`` 采 3 次 -> 合并 -> 存为 ``user_id`` 的指纹。
 
         返回登记模板。进度回调见 :meth:`pyzk20r.device.Scanner.on_enroll_progress`。
@@ -180,8 +168,7 @@ class FingerprintDB:
 
     # -- 比对 -----------------------------------------------------------------
 
-    def identify(self, template):
-        # type: (bytes) -> Tuple[int, int]
+    def identify(self, template: bytes) -> "Tuple[int, int]":
         """1:N 识别, 返回 ``(user_id, score)``; 无匹配抛 :class:`MatchError`。
 
         其他 SDK 错误 (-7/-17 等) 按原始错误码抛对应异常, 不误报为"无匹配"。
@@ -200,8 +187,7 @@ class FingerprintDB:
             raise MatchError(-20, "识别结果无法映射到用户 (fid=%d)" % fid.value)
         return user_id, score.value
 
-    def verify(self, user_id, template):
-        # type: (int, bytes) -> int
+    def verify(self, user_id: int, template: bytes) -> int:
         """1:1 验证: 对 ``user_id`` 的所有指纹取最优分; 不匹配抛 :class:`MatchError`。
 
         SDK 的 VerifyByID 只区分 ">0=分数 / 其他=失败", 失败可能是真不匹配
@@ -223,8 +209,7 @@ class FingerprintDB:
             raise_for(other_err, "1:1 验证失败 (user_id=%r)" % (user_id,))
         raise MatchError(-20, "1:1 验证不匹配 (user_id=%r)" % (user_id,))
 
-    def match(self, template_a, template_b):
-        # type: (bytes, bytes) -> int
+    def match(self, template_a: bytes, template_b: bytes) -> int:
         """直接比对两枚模板, 返回分数; 不匹配抛 :class:`MatchError`。"""
         handle = self._require_open()
         buf_a = ctypes.create_string_buffer(bytes(template_a), len(template_a))
@@ -240,41 +225,35 @@ class FingerprintDB:
     # -- 阈值 -----------------------------------------------------------------
 
     @staticmethod
-    def _get_threshold(handle, code):
-        # type: (int, int) -> int
+    def _get_threshold(handle: int, code: int) -> int:
         value = ctypes.c_int()
         ret = _binding.get_dll().ZKFPM_DBGetParameter(handle, int(code), ctypes.byref(value))
         raise_for(ret, "读取阈值失败")
         return value.value
 
     @property
-    def threshold_1_1(self):
-        # type: () -> int
+    def threshold_1_1(self) -> int:
         """1:1 阈值 (默认 35, 范围 0~100)。"""
         return self._get_threshold(self._require_open(), DBParam.THRESHOLD_1_1)
 
     @threshold_1_1.setter
-    def threshold_1_1(self, value):
-        # type: (int) -> None
+    def threshold_1_1(self, value: int) -> None:
         raise_for(_binding.get_dll(self._dll_path).ZKFPM_DBSetParameter(
             self._require_open(), int(DBParam.THRESHOLD_1_1), int(value)), "设置 1:1 阈值失败")
 
     @property
-    def threshold_1_n(self):
-        # type: () -> int
+    def threshold_1_n(self) -> int:
         """1:N 阈值 (默认 55, 范围 0~100)。"""
         return self._get_threshold(self._require_open(), DBParam.THRESHOLD_1_N)
 
     @threshold_1_n.setter
-    def threshold_1_n(self, value):
-        # type: (int) -> None
+    def threshold_1_n(self, value: int) -> None:
         raise_for(_binding.get_dll(self._dll_path).ZKFPM_DBSetParameter(
             self._require_open(), int(DBParam.THRESHOLD_1_N), int(value)), "设置 1:N 阈值失败")
 
     # -- 图像提取 ---------------------------------------------------------------
 
-    def extract_from_image(self, path, dpi=500):
-        # type: (str, int) -> bytes
+    def extract_from_image(self, path: str, dpi: int = 500) -> bytes:
         """从 BMP 图片提取指纹模板 (仅 SDK 标准版支持)。"""
         handle = self._require_open()
         buf = ctypes.create_string_buffer(MAX_TEMPLATE_SIZE)

@@ -17,8 +17,7 @@ __all__ = [
 class ZKFPMError(RuntimeError):
     """SDK 错误基类。``code`` 为原始 SDK 错误码 (0 成功, 其他见文档附录)。"""
 
-    def __init__(self, code, message=None):
-        # type: (int, Optional[str]) -> None
+    def __init__(self, code: int, message: "Optional[str]" = None) -> None:
         self.code = int(code)
         super(ZKFPMError, self).__init__(message or ("SDK 错误码 %d" % self.code))
 
@@ -72,14 +71,12 @@ _ERROR_CLASS_BY_CODE = {
 }
 
 
-def error_class(code, fallback=ZKFPMError):
-    # type: (int, type) -> type
+def error_class(code: int, fallback: type = ZKFPMError) -> type:
     """错误码对应的异常类 (供需要先判断再抛出的调用方使用)。"""
     return _ERROR_CLASS_BY_CODE.get(int(code), fallback)
 
 
-def raise_for(code, message=None, fallback=ZKFPMError):
-    # type: (int, Optional[str], type) -> None
+def raise_for(code: int, message: "Optional[str]" = None, fallback: type = ZKFPMError) -> None:
     """SDK 返回非 0 时抛出对应异常; 0 时无事发生。"""
     if code != 0:
         raise error_class(code, fallback)(int(code), message)

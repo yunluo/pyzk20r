@@ -4,8 +4,8 @@
 低层封装: DLL 加载/定位、函数原型声明、错误码与参数代码枚举、
 全局初始化引用计数。上层 (device/db) 只通过本模块访问 SDK。
 
-语法兼容 Python 3.4 (Windows XP): 禁用 f-string / 变量标注 / typing 导入,
-类型一律使用 PEP 484 注释式标注。
+语法兼容 Python 3.4 (Windows XP): 禁用 f-string / 变量标注语法 / typing 导入;
+参数/返回类型用内联标注 (PEP 3107), typing 构造以字符串形式标注, 变量用注释。
 """
 from __future__ import absolute_import
 
@@ -96,8 +96,7 @@ class DBParam(enum.IntEnum):
 # DLL 加载
 # ---------------------------------------------------------------------------
 
-def resolve_dll_path(explicit=None):
-    # type: (Optional[str]) -> str
+def resolve_dll_path(explicit: "Optional[str]" = None) -> str:
     """按 显式指定 -> 环境变量 -> 系统 的顺序定位 DLL。
 
     依赖系统副本: libzkfp.dll 的内部依赖 (ZKFPCap.dll -> fppswsk12.dll ->
@@ -118,8 +117,7 @@ def resolve_dll_path(explicit=None):
     return _DLL_NAME                             # 兜底: 交给系统搜索 (SysWOW64/PATH)
 
 
-def load_dll(path=None):
-    # type: (Optional[str]) -> ctypes.WinDLL
+def load_dll(path: "Optional[str]" = None) -> ctypes.WinDLL:
     """加载 libzkfp.dll 并声明全部函数原型 (stdcall)。"""
     dll = ctypes.WinDLL(resolve_dll_path(path))
     _set_prototypes(dll)
@@ -130,8 +128,7 @@ def load_dll(path=None):
 dll = None                                     # type: Optional[ctypes.WinDLL]
 
 
-def get_dll(path=None):
-    # type: (Optional[str]) -> ctypes.WinDLL
+def get_dll(path: "Optional[str]" = None) -> ctypes.WinDLL:
     """返回已加载的 DLL, 必要时加载。
 
     首次加载后全局缓存, 再次调用时 ``path`` 被忽略 (先加载者优先);
@@ -143,8 +140,7 @@ def get_dll(path=None):
     return dll
 
 
-def _set_prototypes(dll):
-    # type: (ctypes.WinDLL) -> None
+def _set_prototypes(dll: ctypes.WinDLL) -> None:
     """声明本库使用的 SDK 函数原型。仅绑定现行 DB* 接口, 旧别名不绑定。"""
     c_int = ctypes.c_int
     c_uint = ctypes.c_uint
@@ -197,8 +193,7 @@ def _set_prototypes(dll):
 _init_refs = 0
 
 
-def lib_addref(path=None):
-    # type: (Optional[str]) -> ctypes.WinDLL
+def lib_addref(path: "Optional[str]" = None) -> ctypes.WinDLL:
     """确保 SDK 已初始化并递增引用计数, 返回 DLL。"""
     global _init_refs
     d = get_dll(path)
@@ -210,8 +205,7 @@ def lib_addref(path=None):
     return d
 
 
-def lib_release():
-    # type: () -> None
+def lib_release() -> None:
     """递减引用计数, 归零时释放 SDK 资源。"""
     global _init_refs
     if _init_refs > 0:

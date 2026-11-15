@@ -5,7 +5,8 @@
 基于官方 [ZKFinger Reader SDK C API](https://www.zksps.com/productinfo/46887.html) 的纯 `ctypes` 封装:
 
 - **零第三方依赖**, 纯标准库
-- 支持 **Windows XP / Python 3.4+** (单一代码库, 语法兼容 3.4, 类型为 PEP 484 注释式标注)
+- 支持 **Windows XP / Python 3.4+** (单一代码库, 语法兼容 3.4, 类型标注为 PEP 484:
+  参数/返回内联标注, typing 构造以字符串形式标注, 变量用注释)
 - 使用驱动安装的系统 DLL (不捆绑分发, 见 DLL 查找顺序)
 - 同步阻塞 + 生成器式持续采集; 无内部线程, 单线程使用; 方法粒度小, 便于子类覆写
 - **一人多指纹** 模型: `user_id` 可登记多枚指纹, 识别直接返回用户
@@ -141,7 +142,7 @@ ZKFPMError (含 .code 原始 SDK 错误码)
 ```bash
 uv run pytest                     # mock 单元测试 + 真机冒烟 (无设备自动跳过)
 uv run ruff check .               # lint
-uv run mypy                       # 类型检查 (注释式标注)
+uv run mypy                       # 类型检查 (PEP 484 标注)
 ```
 
 dev 工具由 `[dependency-groups]` 提供 (pytest / ruff / mypy), `uv run` 自动同步。

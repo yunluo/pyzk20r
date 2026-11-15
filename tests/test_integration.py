@@ -100,15 +100,19 @@ def _is_constant_false(test):
     return isinstance(test, ast.Constant) and test.value is False
 
 
-def test_sources_use_type_comments():
-    """公共 API 均带 PEP 484 注释式标注 (抽样检查核心模块)。"""
-    core = ["device.py", "db.py", "exceptions.py"]
+def test_sources_use_inline_annotations():
+    """公共 API 使用内联参数/返回标注; 禁止旧式全签名注释 ``# type: (...)``。
+
+    变量类型注释 (如 ``x = None  # type: Optional[int]``) 仍允许 —— 3.4 无变量标注语法。
+    """
+    core = ["device.py", "db.py", "exceptions.py", "_binding.py"]
     for name in core:
         path = os.path.join(PKG_DIR, name)
         assert os.path.exists(path)
         with open(path, "rb") as f:
             src = f.read().decode("utf-8")
-        assert "# type: (" in src, "%s 缺少注释式类型标注" % name
+        assert "# type: (" not in src, "%s 仍存在旧式签名注释标注" % name
+        assert "-> " in src, "%s 缺少内联返回类型标注" % name
 
 
 @pytest.mark.parametrize("name", ["Scanner", "FingerprintDB", "Frame", "ZKFPMError"])

@@ -12,7 +12,8 @@
             break
 
 子类可覆写 ``on_enroll_progress`` / ``acquire`` / ``_try_acquire`` 等钩子。
-语法兼容 Python 3.4 (Windows XP), 类型使用 PEP 484 注释式标注。
+语法兼容 Python 3.4 (Windows XP): 参数/返回类型用内联标注 (PEP 3107),
+typing 构造以字符串形式标注 (运行时不求值), 变量类型用注释。
 """
 from __future__ import absolute_import
 
@@ -65,16 +66,14 @@ class Frame:
 
     __slots__ = ("image", "template", "width", "height", "dpi")
 
-    def __init__(self, image, template, width, height, dpi):
-        # type: (bytes, bytes, int, int, int) -> None
+    def __init__(self, image: bytes, template: bytes, width: int, height: int, dpi: int) -> None:
         self.image = image
         self.template = template
         self.width = width
         self.height = height
         self.dpi = dpi
 
-    def to_bmp(self):
-        # type: () -> bytes
+    def to_bmp(self) -> bytes:
         """图像转 8 位灰度 BMP 字节流 (纯 stdlib, 无 PIL 依赖)。"""
         if len(self.image) < self.width * self.height:
             raise ValueError(
@@ -93,7 +92,7 @@ class Frame:
             parts.append(b"\x00" * (row_size - self.width))
         return b"".join(parts)
 
-    def __repr__(self):
+    def __repr__(self) -> str:
         return "Frame(template=%d bytes, image=%dx%d@%ddpi)" % (
             len(self.template), self.width, self.height, self.dpi)
 
@@ -108,8 +107,7 @@ class Scanner:
     初始化计数均不加锁, 请勿在多个线程并发构造/关闭设备或并发采集。
     """
 
-    def __init__(self, index=0, dll_path=None):
-        # type: (int, Optional[str]) -> None
+    def __init__(self, index: int = 0, dll_path: "Optional[str]" = None) -> None:
         self._index = int(index)
         self._dll_path = dll_path
         self._handle = None                            # type: Optional[int]
@@ -117,8 +115,7 @@ class Scanner:
 
     # -- 生命周期 -----------------------------------------------------------
 
-    def open(self):
-        # type: () -> None
+    def open(self) -> None:
         """打开设备 (先确保 SDK 初始化)。"""
         if self._handle is not None:
             raise ZKFPMError(ZKFPErr.ALREADY_OPENED, "设备已打开")
@@ -132,8 +129,7 @@ class Scanner:
             raise DeviceNotFoundError(ZKFPErr.OPEN, "打开设备失败 (index=%d)" % self._index)
         self._handle = handle
 
-    def close(self):
-        # type: () -> None
+    def close(self) -> None:
         """关闭设备并释放 SDK 引用。可安全重复调用。"""
         if self._handle is None:
             return
@@ -143,31 +139,26 @@ class Scanner:
         raise_for(ret, "关闭设备失败")
 
     @property
-    def closed(self):
-        # type: () -> bool
+    def closed(self) -> bool:
         return self._handle is None
 
-    def __enter__(self):
-        # type: () -> Scanner
+    def __enter__(self) -> "Scanner":
         return self
 
-    def __exit__(self, exc_type, exc_val, exc_tb):
-        # type: (type, BaseException, object) -> None
+    def __exit__(self, exc_type: type, exc_val: BaseException, exc_tb: object) -> None:
         self.close()
 
-    def _require_open(self):
-        # type: () -> int
+    def _require_open(self) -> int:
         if self._handle is None:
             raise ZKFPMError(ZKFPErr.NOT_OPENED, "设备未打开")
         return self._handle
 
-    def __repr__(self):
+    def __repr__(self) -> str:
         return "Scanner(index=%d, closed=%s)" % (self._index, self.closed)
 
     # -- 参数 ---------------------------------------------------------------
 
-    def get_param_bytes(self, code, size):
-        # type: (int, int) -> bytes
+    def get_param_bytes(self, code: int, size: int) -> bytes:
         """读取参数原始字节。"""
         handle = self._require_open()
         buf = ctypes.create_string_buffer(size)
@@ -176,81 +167,67 @@ class Scanner:
         raise_for(ret, "读取参数 %d 失败" % code, DeviceError)
         return buf.raw[:n.value]
 
-    def get_param_int(self, code):
-        # type: (int) -> int
+    def get_param_int(self, code: int) -> int:
         """读取 int 型参数。"""
         return struct.unpack("<i", self.get_param_bytes(code, 4))[0]
 
-    def set_param_int(self, code, value):
-        # type: (int, int) -> None
+    def set_param_int(self, code: int, value: int) -> None:
         """写入 int 型参数。"""
         handle = self._require_open()
         buf = ctypes.create_string_buffer(struct.pack("<i", int(value)), 4)
         ret = _binding.get_dll().ZKFPM_SetParameters(handle, int(code), buf, 4)
         raise_for(ret, "设置参数 %d 失败" % code, DeviceError)
 
-    def get_param_str(self, code):
-        # type: (int) -> str
+    def get_param_str(self, code: int) -> str:
         """读取字符串型参数 (厂商/产品名/序列号)。忽略不可解码字节 (兼容 GBK 控制台)。"""
         raw = self.get_param_bytes(code, _PARAM_STR_BUF).split(b"\x00")[0]
         return raw.decode("mbcs", "ignore")
 
     @property
-    def width(self):
-        # type: () -> int
+    def width(self) -> int:
         return self.get_param_int(Param.IMG_WIDTH)
 
     @property
-    def height(self):
-        # type: () -> int
+    def height(self) -> int:
         return self.get_param_int(Param.IMG_HEIGHT)
 
     @property
-    def dpi(self):
-        # type: () -> int
+    def dpi(self) -> int:
         return self.get_param_int(Param.DPI)
 
     @dpi.setter
-    def dpi(self, value):
-        # type: (int) -> None
+    def dpi(self, value: int) -> None:
         self.set_param_int(Param.DPI, value)          # Live20R 可写, 例如儿童指纹建议 750/1000
 
     @property
-    def fake_detect(self):
-        # type: () -> bool
+    def fake_detect(self) -> bool:
         return bool(self.get_param_int(Param.FAKE_SWITCH))
 
     @fake_detect.setter
-    def fake_detect(self, enabled):
-        # type: (bool) -> None
+    def fake_detect(self, enabled: bool) -> None:
         self.set_param_int(Param.FAKE_SWITCH, 1 if enabled else 0)
 
     @property
-    def finger_is_live(self):
-        # type: () -> bool
+    def finger_is_live(self) -> bool:
         """最近一次采集是否为真手指 (需先开启 fake_detect)。低五位全 1 为真。"""
         return (self.get_param_int(Param.FAKE_STATUS) & 31) == 31
 
     @property
-    def device_ok(self):
-        # type: () -> bool
+    def device_ok(self) -> bool:
         return self.get_param_int(Param.DEVICE_STATUS) == 1
 
     @property
-    def template_format(self):
-        # type: () -> str
+    def template_format(self) -> str:
         return "iso" if self.get_param_int(Param.TEMPLATE_FORMAT) else "ansi"
 
     @template_format.setter
-    def template_format(self, value):
-        # type: (str) -> None
+    def template_format(self, value: str) -> None:
         fmt = {"ansi": 0, "iso": 1}.get(value)
         if fmt is None:
             raise ValueError("template_format 只支持 'ansi' / 'iso'")
         self.set_param_int(Param.TEMPLATE_FORMAT, fmt)
 
-    def led(self, color, on=True):
-        # type: (str, bool) -> None
+    def led(self, color: str, on: bool = True) -> None:
         """控制指示灯闪烁, ``color``: 'white' / 'green' / 'red'。"""
         try:
             code = _LED_CODES[color]
@@ -258,8 +235,7 @@ class Scanner:
             raise ValueError("color 只支持 'white' / 'green' / 'red'")
         self.set_param_int(code, 1 if on else 0)
 
-    def info(self):
-        # type: () -> DeviceInfo
+    def info(self) -> DeviceInfo:
         raw = self.get_param_bytes(Param.VID_PID, 4)
         if len(raw) < 4:                             # 部分固件不回填, 防御 struct.error
             raw = (raw + b"\x00\x00\x00\x00")[:4]
@@ -271,8 +247,7 @@ class Scanner:
             vid_pid="VID_%04X PID_%04X" % (vid, pid),
         )
 
-    def template_quality(self, template):
-        # type: (bytes) -> int
+    def template_quality(self, template: bytes) -> int:
         """评估模板质量 (0~100, 越高越好)。返回值为质量分, 负数才是错误码。"""
         handle = self._require_open()
         buf = ctypes.create_string_buffer(bytes(template), len(template))
@@ -283,8 +258,7 @@ class Scanner:
 
     # -- 采集 ---------------------------------------------------------------
 
-    def capture_params(self):
-        # type: () -> Tuple[int, int, int]
+    def capture_params(self) -> "Tuple[int, int, int]":
         """返回 (width, height, dpi)。"""
         handle = self._require_open()
         w, h, dpi = ctypes.c_int(), ctypes.c_int(), ctypes.c_int()
@@ -293,8 +267,7 @@ class Scanner:
         raise_for(ret, "获取采集参数失败", DeviceError)
         return w.value, h.value, dpi.value
 
-    def acquire_image(self):
-        # type: () -> bytes
+    def acquire_image(self) -> bytes:
         """只取图像 (阻塞, 需有手指)。"""
         handle = self._require_open()
         width, height, _dpi = self.capture_params()
@@ -303,8 +276,7 @@ class Scanner:
         raise_for(ret, "取像失败")
         return buf.raw
 
-    def _try_acquire(self):
-        # type: () -> Optional[Frame]
+    def _try_acquire(self) -> "Optional[Frame]":
         """尝试采集一次; 瞬态失败 (暂无手指等) 返回 None, 其他错误抛异常。"""
         handle = self._require_open()
         width, height, dpi = self.capture_params()
@@ -319,16 +291,14 @@ class Scanner:
             return None
         raise error_class(int(ret))(int(ret), "采集失败")
 
-    def acquire(self):
-        # type: () -> Frame
+    def acquire(self) -> Frame:
         """阻塞采集一次 (需有手指), 失败抛 :class:`CaptureError`。"""
         frame = self._try_acquire()
         if frame is None:
             raise CaptureError(int(ZKFPErr.CAPTURE), "取像失败")
         return frame
 
-    def capture(self, poll_interval=0.1):
-        # type: (float) -> Generator[Frame, None, None]
+    def capture(self, poll_interval: float = 0.1) -> "Generator[Frame, None, None]":
         """持续采集生成器: 反复尝试, 成功则 yield Frame, 失败休眠重试。
 
         ``poll_interval`` 为失败重试间隔秒数 (0 为连续轮询)。
@@ -341,8 +311,7 @@ class Scanner:
             elif poll_interval > 0:
                 time.sleep(poll_interval)
 
-    def enroll(self, poll_interval=0.1):
-        # type: (float) -> List[bytes]
+    def enroll(self, poll_interval: float = 0.1) -> "List[bytes]":
         """连续采集 3 次 (SDK 登记合并 ZKFPM_DBMerge 固定要求 3 枚), 返回模板列表。
 
         每成功一次调用一次 :meth:`on_enroll_progress` 钩子。
@@ -359,6 +328,5 @@ class Scanner:
             self.on_enroll_progress(len(templates), total)
         return templates
 
-    def on_enroll_progress(self, done, total):
-        # type: (int, int) -> None
+    def on_enroll_progress(self, done: int, total: int) -> None:
         """登记进度钩子, 子类覆写。``done`` 从 1 计数。"""
