@@ -254,22 +254,6 @@ sdist 额外含 `tests/` 与 `examples/`(指纹数据 `*.db` 自动排除)。
 SDK 文档 (中英文 PDF + 头文件 + MFC Demo) 从 ZKTeco 官网 / "ZKFinger SDK" 安装包获取;
 本库的接口注释即按其 C API 编写。
 
-## 发版 (PyPI)
-
-本库**仅支持 Windows**, 且**只通过 tag 推送发版**:
-推送 `vX.Y.Z` tag 后, Actions 自动执行 测试 (Windows) → 构建并校验 tag 与版本一致 → 发布 PyPI。
-
-```bash
-git tag v0.1.0
-git push origin v0.1.0            # 触发 release.yml
-```
-
-前置 (一次性, 二选一):
-- **推荐**: 在 pypi.org 的 pyzk20r 项目页配置 Trusted Publisher
-  (`owner=yunluo`, `repo=pyzk_20r`, `workflow=release.yml`, `environment=pypi`)
-- 或在 GitHub 仓库 Settings → Secrets 添加 `PYPI_API_TOKEN`,
-  并按 `release.yml` 内注释把发布 step 改为 token 方式
-
 ## License
 
 MIT (见 LICENSE)。ZKFinger SDK 及 `libzkfp.dll` 版权归 ZKTeco 所有, 需随官方驱动获取, 仅供配合其设备使用。
